@@ -1,0 +1,7 @@
+{
+  "name": "Ceiling Fan Card",
+  "description": "כרטיס מאוורר תקרה מעוצב עם 6 מצבי מהירות עבור Home Assistant Lovelace",
+  "content_in_root": true,
+  "filename": "ceiling-fan-card.js",
+  "render_readme": true
+}
