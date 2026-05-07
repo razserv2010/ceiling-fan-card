@@ -179,11 +179,12 @@ class CeilingFanCard extends HTMLElement {
       <div class="header">
         <div>
           <div class="title" id="name">מאוורר תקרה</div>
-
         </div>
-        <button class="power-btn" id="power">
-          <svg viewBox="0 0 24 24"><path d="M12 2v6M6.3 6.3A8 8 0 1 0 17.7 6.3"/></svg>
-        </button>
+        <div class="btns" id="btns">
+          <button class="power-btn" id="power">
+            <svg viewBox="0 0 24 24"><path d="M12 2v6M6.3 6.3A8 8 0 1 0 17.7 6.3"/></svg>
+          </button>
+        </div>
       </div>
 
       <div class="fan-center">
@@ -223,18 +224,24 @@ class CeilingFanCard extends HTMLElement {
       b.addEventListener('click', () => this._setSpeed(parseInt(b.dataset.idx) + 1))
     );
     if (this._extra) {
-      const btn = r.getElementById('extra-btn');
-      if (btn) {
-        btn.addEventListener('click', () => this._handleExtraTap());
-        // Use ha-icon if mdi icon specified
-        if (this._extra.icon) {
-          const haIcon = document.createElement('ha-icon');
-          haIcon.setAttribute('icon', this._extra.icon);
-          haIcon.style.cssText = '--mdc-icon-size:18px; color:#fbbf24;';
-          btn.innerHTML = '';
-          btn.appendChild(haIcon);
-        }
+      const btns = r.getElementById('btns');
+      const extraBtn = document.createElement('button');
+      extraBtn.className = 'extra-btn';
+      extraBtn.id = 'extra-btn';
+
+      if (this._extra.icon) {
+        // Use ha-icon for mdi icons
+        const haIcon = document.createElement('ha-icon');
+        haIcon.setAttribute('icon', this._extra.icon);
+        haIcon.style.cssText = '--mdc-icon-size:18px; color:#fbbf24;';
+        extraBtn.appendChild(haIcon);
+      } else {
+        // Default timer SVG
+        extraBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fbbf24;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 6a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/><path d="M12 10v4l2.5 2.5"/><path d="M9 2h6M12 2v4"/><path d="M18.4 5.6l1.4-1.4"/></svg>';
       }
+
+      extraBtn.addEventListener('click', () => this._handleExtraTap());
+      btns.insertBefore(extraBtn, btns.firstChild);
     }
   }
 
