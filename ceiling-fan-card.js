@@ -296,15 +296,26 @@ class CeilingFanCard extends HTMLElement {
 
   _handleExtraTap() {
     if (!this._extra || !this._hass) return;
+  
+    const tapAction = this._extra.tap_action || { action: 'more-info' };
+  
+    // תאימות למבנה ישן
+    if (tapAction.action === 'perform-action') {
+      tapAction.action = 'perform_action';
+    }
+  
     this.dispatchEvent(new CustomEvent('hass-action', {
-      bubbles: true, composed: true,
+      bubbles: true,
+      composed: true,
       detail: {
-        config: { entity: this._extra.entity, tap_action: this._extra.tap_action },
+        config: {
+          entity: this._extra.entity,
+          tap_action: tapAction,
+        },
         action: 'tap',
       },
     }));
   }
-}
 
 /* ══ Editor ══ */
 const EDITOR_STYLES = `
@@ -483,8 +494,13 @@ class CeilingFanCardEditor extends HTMLElement {
   }
 }
 
-customElements.define('ceiling-fan-card', CeilingFanCard);
-customElements.define('ceiling-fan-card-editor', CeilingFanCardEditor);
+if (!customElements.get('ceiling-fan-card')) {
+  customElements.define('ceiling-fan-card', CeilingFanCard);
+}
+
+if (!customElements.get('ceiling-fan-card-editor')) {
+  customElements.define('ceiling-fan-card-editor', CeilingFanCardEditor);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
