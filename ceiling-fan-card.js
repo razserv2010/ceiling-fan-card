@@ -15,17 +15,17 @@
  * Usage (YAML):
  *   type: custom:ceiling-fan-card
  *   entity: fan.my_ceiling_fan
- *   name: מאוורר סלון             # optional
- *   speed_names:                   # optional — Hebrew speed labels
+ *   name: מאוורר סלון
+ *   speed_names:
  *     - חלש מאוד
  *     - חלש
  *     - בינוני-חלש
  *     - בינוני
  *     - חזק
  *     - חזק מאוד
- *   extra_entity:                  # optional — any extra entity row
+ *   extra_entity:
  *     entity: switch_timer.toggle_fan
- *     name: טיימר מאוורר          # optional label
+ *     name: טיימר מאוורר
  *     tap_action:
  *       action: toggle
  */
@@ -95,26 +95,19 @@ const STYLES = `
   .spd-btn:hover::after { height: 100%; }
   .spd-btn.active { border-color: rgba(56,189,248,0.6); background: rgba(56,189,248,0.1); box-shadow: 0 0 14px rgba(56,189,248,0.15), inset 0 1px 0 rgba(56,189,248,0.2); }
   .spd-btn.active::after { height: 100%; }
-
   .btn-lbl { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.3); line-height: 1.2; transition: color .2s; position: relative; z-index: 1; direction: rtl; text-align: center; }
   .spd-btn.active .btn-lbl { color: #38bdf8; }
   .btn-dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: background .2s; position: relative; z-index: 1; }
   .spd-btn.active .btn-dot { background: #38bdf8; }
 
-  /* Extra entity row */
   .extra-row {
     display: flex; align-items: center; gap: 10px;
     border-top: 1px solid rgba(255,255,255,0.06);
-    padding-top: 14px; margin-bottom: 14px;
-    cursor: pointer; border-radius: 8px; padding: 10px 6px;
-    transition: background .2s;
+    padding: 10px 6px; margin-bottom: 14px;
+    cursor: pointer; border-radius: 8px; transition: background .2s;
   }
   .extra-row:hover { background: rgba(255,255,255,0.03); }
-  .extra-icon {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .3s;
-  }
+  .extra-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .3s; }
   .extra-icon.on { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.3); }
   .extra-icon svg { width: 15px; height: 15px; stroke: rgba(255,255,255,0.3); fill: none; stroke-width: 1.5; stroke-linecap: round; transition: stroke .3s; }
   .extra-icon.on svg { stroke: #38bdf8; }
@@ -155,26 +148,20 @@ class CeilingFanCard extends HTMLElement {
 
   setConfig(config) {
     if (!config.entity) throw new Error('entity is required');
-    this._config      = config;
-    this._entity      = config.entity;
-    this._name        = config.name || null;
-    this._count       = 6;
-    this._speedNames  = config.speed_names || DEFAULT_SPEED_NAMES;
-    this._extra       = config.extra_entity || null;
+    this._config     = config;
+    this._entity     = config.entity;
+    this._name       = config.name || null;
+    this._count      = 6;
+    this._speedNames = config.speed_names || DEFAULT_SPEED_NAMES;
+    this._extra      = config.extra_entity || null;
     if (this._built) { this._built = false; this._build(); this._built = true; }
   }
 
   getCardSize() { return this._extra ? 6 : 5; }
 
-  static getConfigElement() {
-    return document.createElement('ceiling-fan-card-editor');
-  }
+  static getConfigElement() { return document.createElement('ceiling-fan-card-editor'); }
+  static getStubConfig()    { return { entity: 'fan.my_ceiling_fan' }; }
 
-  static getStubConfig() {
-    return { entity: 'fan.my_ceiling_fan' };
-  }
-
-  /* ─── Build DOM ─── */
   _build() {
     const r = this.shadowRoot;
     r.innerHTML = '';
@@ -215,7 +202,6 @@ class CeilingFanCard extends HTMLElement {
           <svg viewBox="0 0 24 24"><path d="M12 2v6M6.3 6.3A8 8 0 1 0 17.7 6.3"/></svg>
         </button>
       </div>
-
       <div class="fan-wrap">
         <div class="fan-glow" id="glow"></div>
         <svg class="fan-svg" viewBox="0 0 120 120">
@@ -231,16 +217,12 @@ class CeilingFanCard extends HTMLElement {
           <circle cx="60" cy="60" r="4.5" fill="#38bdf8"/>
         </svg>
       </div>
-
       <div class="speed-display">
         <div class="speed-name off" id="spname">כבוי</div>
         <div class="speed-label">מצב</div>
       </div>
-
       <div class="controls">${btnHtml}</div>
-
       ${extraHtml}
-
       <div class="stats">
         <div class="stat"><div class="stat-val" id="s-rpm">0</div><div class="stat-key">סל״ד</div></div>
         <div class="divider"></div>
@@ -251,18 +233,15 @@ class CeilingFanCard extends HTMLElement {
     `;
 
     r.appendChild(card);
-
     r.getElementById('power').addEventListener('click', () => this._togglePower());
     r.querySelectorAll('.spd-btn').forEach(b =>
       b.addEventListener('click', () => this._setSpeed(parseInt(b.dataset.idx) + 1))
     );
-
     if (this._extra) {
       r.getElementById('extra-row').addEventListener('click', () => this._handleExtraTap());
     }
   }
 
-  /* ─── Sync from HA state ─── */
   _sync() {
     const obj = this._hass?.states[this._entity];
     if (!obj) return;
@@ -281,22 +260,19 @@ class CeilingFanCard extends HTMLElement {
     this._syncExtra();
   }
 
-  /* ─── Sync extra entity row ─── */
   _syncExtra() {
     if (!this._extra) return;
-    const r = this.shadowRoot;
+    const r   = this.shadowRoot;
     const obj = this._hass?.states[this._extra.entity];
     const icon  = r.getElementById('extra-icon');
     const state = r.getElementById('extra-state');
     if (!obj || !icon || !state) return;
-
     const isOn = obj.state === 'on';
     icon.classList.toggle('on', isOn);
     state.textContent = isOn ? 'פעיל' : 'כבוי';
     state.classList.toggle('on', isOn);
   }
 
-  /* ─── Render visuals ─── */
   _render(isOn, lvl) {
     const $ = id => this.shadowRoot.getElementById(id);
     const $$ = sel => this.shadowRoot.querySelectorAll(sel);
@@ -340,7 +316,6 @@ class CeilingFanCard extends HTMLElement {
     requestAnimationFrame(step);
   }
 
-  /* ─── HA service calls ─── */
   _togglePower() {
     const isOn = this._hass?.states[this._entity]?.state === 'on';
     this._hass.callService('fan', isOn ? 'turn_off' : 'turn_on', { entity_id: this._entity });
@@ -356,22 +331,22 @@ class CeilingFanCard extends HTMLElement {
   _handleExtraTap() {
     if (!this._extra || !this._hass) return;
     const action = this._extra.tap_action?.action || 'toggle';
-    const entity  = this._extra.entity;
+    const entity = this._extra.entity;
     const [domain] = entity.split('.');
 
     if (action === 'toggle') {
       this._hass.callService(domain, 'toggle', { entity_id: entity });
     } else if (action === 'more-info') {
-      const ev = new CustomEvent('hass-more-info', { detail: { entityId: entity }, bubbles: true, composed: true });
-      this.dispatchEvent(ev);
+      this.dispatchEvent(new CustomEvent('hass-more-info', {
+        detail: { entityId: entity }, bubbles: true, composed: true
+      }));
     } else if (action === 'call-service') {
       const { service, service_data } = this._extra.tap_action;
-      const [svc_domain, svc_name] = service.split('.');
-      this._hass.callService(svc_domain, svc_name, service_data || {});
+      const [sd, sn] = service.split('.');
+      this._hass.callService(sd, sn, service_data || {});
     } else if (action === 'navigate') {
       history.pushState(null, '', this._extra.tap_action.navigation_path);
-      const ev = new CustomEvent('location-changed', { bubbles: true, composed: true });
-      window.dispatchEvent(ev);
+      window.dispatchEvent(new CustomEvent('location-changed', { bubbles: true, composed: true }));
     }
   }
 }
@@ -380,18 +355,32 @@ class CeilingFanCard extends HTMLElement {
    Visual Editor
 ══════════════════════════════ */
 const EDITOR_STYLES = `
-  .wrap { font-family: sans-serif; padding: 4px 0; }
-  .sec-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--secondary-text-color); margin: 16px 0 8px; border-bottom: 1px solid var(--divider-color); padding-bottom: 4px; }
-  .field { margin-bottom: 10px; }
+  :host { display: block; }
+  .wrap { padding: 4px 0; }
+  .sec-title {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--secondary-text-color);
+    margin: 18px 0 10px; padding-bottom: 5px;
+    border-bottom: 1px solid var(--divider-color);
+  }
+  .field { margin-bottom: 12px; }
   .speed-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .field-lbl { font-size: 12px; color: var(--secondary-text-color); margin-bottom: 4px; }
-  ha-textfield { width: 100%; }
-  ha-select { width: 100%; }
-  ha-formfield { display: block; margin-bottom: 8px; }
-  .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
-  .toggle-label { font-size: 14px; color: var(--primary-text-color); }
-  .toggle-sub { font-size: 12px; color: var(--secondary-text-color); }
-  .extra-block { padding: 12px; background: var(--secondary-background-color); border-radius: 8px; margin-top: 8px; }
+  ha-textfield { width: 100%; display: block; }
+  ha-select    { width: 100%; display: block; }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--secondary-background-color);
+    border-radius: 8px; cursor: pointer;
+  }
+  .toggle-lbl { font-size: 14px; color: var(--primary-text-color); }
+  .toggle-sub { font-size: 12px; color: var(--secondary-text-color); margin-top: 2px; }
+  .extra-block {
+    margin-top: 10px; padding: 12px;
+    background: var(--secondary-background-color);
+    border-radius: 8px;
+  }
+  ha-entity-picker { width: 100%; display: block; margin-bottom: 12px; }
 `;
 
 class CeilingFanCardEditor extends HTMLElement {
@@ -406,7 +395,13 @@ class CeilingFanCardEditor extends HTMLElement {
     this._render();
   }
 
-  set hass(hass) { this._hass = hass; }
+  set hass(hass) {
+    this._hass = hass;
+    // Pass hass to entity pickers after render
+    this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el => {
+      el.hass = hass;
+    });
+  }
 
   _fire() {
     this.dispatchEvent(new CustomEvent('config-changed', {
@@ -417,6 +412,7 @@ class CeilingFanCardEditor extends HTMLElement {
   _render() {
     const r = this.shadowRoot;
     r.innerHTML = '';
+
     const style = document.createElement('style');
     style.textContent = EDITOR_STYLES;
     r.appendChild(style);
@@ -424,52 +420,49 @@ class CeilingFanCardEditor extends HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'wrap';
 
-    const names = this._config.speed_names || DEFAULT_SPEED_NAMES;
-    const extra = this._config.extra_entity || null;
+    const names   = this._config.speed_names || DEFAULT_SPEED_NAMES;
+    const extra   = this._config.extra_entity || null;
     const hasExtra = !!extra;
-    const tapAction = extra?.tap_action?.action || 'toggle';
 
+    // Speed name inputs
     const speedInputs = names.map((n, i) => `
       <div class="field">
-        <div class="field-lbl">מהירות ${i+1}</div>
-        <ha-textfield data-speed="${i}" value="${n}" style="width:100%"></ha-textfield>
+        <ha-textfield data-speed="${i}" label="מהירות ${i+1}" value="${n}"></ha-textfield>
       </div>`).join('');
 
     wrap.innerHTML = `
       <div class="sec-title">מאוורר</div>
+
+      <div class="field" id="fan-picker-wrap"></div>
+
       <div class="field">
-        <ha-textfield id="f-entity" label="Entity (fan.*)" value="${this._config.entity || ''}" style="width:100%"></ha-textfield>
-      </div>
-      <div class="field">
-        <ha-textfield id="f-name" label="שם מותאם (אופציונלי)" value="${this._config.name || ''}" style="width:100%"></ha-textfield>
+        <ha-textfield id="f-name" label="שם מותאם (אופציונלי)" value="${this._config.name || ''}"></ha-textfield>
       </div>
 
       <div class="sec-title">שמות מהירויות</div>
       <div class="speed-grid">${speedInputs}</div>
 
       <div class="sec-title">ישות נוספת</div>
-      <div class="toggle-row">
+      <div class="toggle-row" id="extra-toggle">
         <div>
-          <div class="toggle-label">הוסף ישות לכרטיס</div>
+          <div class="toggle-lbl">הוסף ישות לכרטיס</div>
           <div class="toggle-sub">כל ישות — switch, input_boolean, script ועוד</div>
         </div>
-        <ha-switch id="extra-toggle" ${hasExtra ? 'checked' : ''}></ha-switch>
+        <ha-switch id="extra-sw" ${hasExtra ? 'checked' : ''}></ha-switch>
       </div>
 
       <div class="extra-block" id="extra-block" style="display:${hasExtra ? 'block' : 'none'}">
+        <div id="extra-picker-wrap"></div>
         <div class="field">
-          <ha-textfield id="f-extra-entity" label="Entity" value="${extra?.entity || ''}" style="width:100%"></ha-textfield>
+          <ha-textfield id="f-extra-name" label="תווית (אופציונלי)" value="${extra?.name || ''}"></ha-textfield>
         </div>
         <div class="field">
-          <ha-textfield id="f-extra-name" label="תווית (אופציונלי)" value="${extra?.name || ''}" style="width:100%"></ha-textfield>
-        </div>
-        <div class="field">
-          <ha-select id="f-tap" label="tap_action" value="${tapAction}" style="width:100%">
-            <mwc-list-item value="toggle">toggle</mwc-list-item>
-            <mwc-list-item value="more-info">more-info</mwc-list-item>
-            <mwc-list-item value="call-service">call-service</mwc-list-item>
-            <mwc-list-item value="navigate">navigate</mwc-list-item>
-            <mwc-list-item value="none">none</mwc-list-item>
+          <ha-select id="f-tap" label="tap_action">
+            <mwc-list-item value="toggle"       ${(extra?.tap_action?.action||'toggle')==='toggle'       ? 'selected':''}>toggle</mwc-list-item>
+            <mwc-list-item value="more-info"    ${(extra?.tap_action?.action||'')==='more-info'    ? 'selected':''}>more-info</mwc-list-item>
+            <mwc-list-item value="call-service" ${(extra?.tap_action?.action||'')==='call-service' ? 'selected':''}>call-service</mwc-list-item>
+            <mwc-list-item value="navigate"     ${(extra?.tap_action?.action||'')==='navigate'     ? 'selected':''}>navigate</mwc-list-item>
+            <mwc-list-item value="none"         ${(extra?.tap_action?.action||'')==='none'         ? 'selected':''}>none</mwc-list-item>
           </ha-select>
         </div>
       </div>
@@ -477,26 +470,55 @@ class CeilingFanCardEditor extends HTMLElement {
 
     r.appendChild(wrap);
 
-    // Events
-    r.getElementById('f-entity').addEventListener('change', e => {
-      this._config = { ...this._config, entity: e.target.value }; this._fire();
+    // ── ha-entity-picker for fan entity ──
+    const fanPicker = document.createElement('ha-entity-picker');
+    fanPicker.label        = 'Entity (fan.*)';
+    fanPicker.value        = this._config.entity || '';
+    fanPicker.includeDomains = ['fan'];
+    fanPicker.allowCustomEntity = false;
+    if (this._hass) fanPicker.hass = this._hass;
+    fanPicker.addEventListener('value-changed', e => {
+      this._config = { ...this._config, entity: e.detail.value };
+      this._fire();
     });
+    r.getElementById('fan-picker-wrap').appendChild(fanPicker);
+
+    // ── ha-entity-picker for extra entity ──
+    const extraPicker = document.createElement('ha-entity-picker');
+    extraPicker.label = 'Entity';
+    extraPicker.value = extra?.entity || '';
+    extraPicker.allowCustomEntity = true;
+    if (this._hass) extraPicker.hass = this._hass;
+    extraPicker.addEventListener('value-changed', e => {
+      this._config = {
+        ...this._config,
+        extra_entity: { ...this._config.extra_entity, entity: e.detail.value }
+      };
+      this._fire();
+    });
+    r.getElementById('extra-picker-wrap').appendChild(extraPicker);
+
+    // ── Events ──
     r.getElementById('f-name').addEventListener('change', e => {
-      this._config = { ...this._config, name: e.target.value || undefined }; this._fire();
+      this._config = { ...this._config, name: e.target.value || undefined };
+      this._fire();
     });
 
     r.querySelectorAll('[data-speed]').forEach(el => {
       el.addEventListener('change', e => {
-        const names = [...(this._config.speed_names || DEFAULT_SPEED_NAMES)];
-        names[parseInt(e.target.dataset.speed)] = e.target.value;
-        this._config = { ...this._config, speed_names: names }; this._fire();
+        const updated = [...(this._config.speed_names || DEFAULT_SPEED_NAMES)];
+        updated[parseInt(e.target.dataset.speed)] = e.target.value;
+        this._config = { ...this._config, speed_names: updated };
+        this._fire();
       });
     });
 
     const extraBlock = r.getElementById('extra-block');
-    r.getElementById('extra-toggle').addEventListener('change', e => {
-      extraBlock.style.display = e.target.checked ? 'block' : 'none';
-      if (!e.target.checked) {
+    r.getElementById('extra-toggle').addEventListener('click', () => {
+      const sw = r.getElementById('extra-sw');
+      sw.checked = !sw.checked;
+      extraBlock.style.display = sw.checked ? 'block' : 'none';
+      if (!sw.checked) {
         const { extra_entity, ...rest } = this._config;
         this._config = rest;
       } else {
@@ -505,16 +527,19 @@ class CeilingFanCardEditor extends HTMLElement {
       this._fire();
     });
 
-    r.getElementById('f-extra-entity').addEventListener('change', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, entity: e.target.value } };
-      this._fire();
-    });
     r.getElementById('f-extra-name').addEventListener('change', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, name: e.target.value || undefined } };
+      this._config = {
+        ...this._config,
+        extra_entity: { ...this._config.extra_entity, name: e.target.value || undefined }
+      };
       this._fire();
     });
+
     r.getElementById('f-tap').addEventListener('selected', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: { action: e.detail.value } } };
+      this._config = {
+        ...this._config,
+        extra_entity: { ...this._config.extra_entity, tap_action: { action: e.detail.value } }
+      };
       this._fire();
     });
   }
