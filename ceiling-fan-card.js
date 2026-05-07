@@ -237,7 +237,10 @@ class CeilingFanCard extends HTMLElement {
         if (this._extra.icon) {
           const haIcon = document.createElement('ha-icon');
           haIcon.setAttribute('icon', this._extra.icon);
-          haIcon.style.cssText = '--mdc-icon-size:18px; color:#fbbf24;';
+          const color = this._extra?.icon_color
+          ? `var(--${this._extra.icon_color}-color, ${this._extra.icon_color})`
+          : '#fbbf24';
+        haIcon.style.cssText = \`--mdc-icon-size:18px; color:\${color};\`;
           extraBtn.appendChild(haIcon);
         } else {
           extraBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fbbf24;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 6a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/><path d="M12 10v4l2.5 2.5"/><path d="M9 2h6M12 2v4"/><path d="M18.4 5.6l1.4-1.4"/></svg>';
@@ -310,7 +313,10 @@ class CeilingFanCard extends HTMLElement {
       if (this._extra.icon) {
         const haIcon = document.createElement('ha-icon');
         haIcon.setAttribute('icon', this._extra.icon);
-        haIcon.style.cssText = '--mdc-icon-size:18px; color:#fbbf24;';
+        const color = this._extra?.icon_color
+          ? `var(--${this._extra.icon_color}-color, ${this._extra.icon_color})`
+          : '#fbbf24';
+        haIcon.style.cssText = \`--mdc-icon-size:18px; color:\${color};\`;
         extraBtn.appendChild(haIcon);
       } else {
         extraBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fbbf24;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 6a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/><path d="M12 10v4l2.5 2.5"/><path d="M9 2h6M12 2v4"/><path d="M18.4 5.6l1.4-1.4"/></svg>';
@@ -465,6 +471,8 @@ class CeilingFanCardEditor extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el => el.hass = hass);
+    this.shadowRoot.querySelectorAll('ha-icon-picker').forEach(el => el.hass = hass);
+    this.shadowRoot.querySelectorAll('ha-form').forEach(el => el.hass = hass);
   }
 
   _fire() {
@@ -572,6 +580,60 @@ class CeilingFanCardEditor extends HTMLElement {
 
     r.getElementById('f-extra-name').addEventListener('change', e => {
       this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, name: e.target.value || undefined } };
+      this._fire();
+    });
+
+    // ha-yaml-editor for tap_action — built after extra block shown
+    const tapYamlWrap = r.getElementById('tap-yaml-wrap');
+    if (tapYamlWrap) {
+      const yamlEditor = document.createElement('ha-yaml-editor');
+      yamlEditor.label = 'tap_action';
+      yamlEditor.defaultValue = extra?.tap_action || { action: 'more-info' };
+      yamlEditor.addEventListener('value-changed', e => {
+        if (e.detail.isValid) {
+          this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value } };
+          this._fire();
+        }
+      });
+      tapYamlWrap.appendChild(yamlEditor);
+    }
+
+    // ha-icon-picker
+    const iconPickerWrap = r.getElementById('icon-picker-wrap');
+    if (iconPickerWrap) {
+      const iconPicker = document.createElement('ha-icon-picker');
+      iconPicker.label = 'אייקון';
+      iconPicker.value = extra?.icon || 'mdi:camera-timer';
+      if (this._hass) iconPicker.hass = this._hass;
+      iconPicker.addEventListener('value-changed', e => {
+        this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, icon: e.detail.value } };
+        this._fire();
+      });
+      iconPickerWrap.appendChild(iconPicker);
+    }
+
+    // ha-color-picker via ha-form with color selector
+    const colorPickerWrap = r.getElementById('color-picker-wrap');
+    if (colorPickerWrap) {
+      const colorForm = document.createElement('ha-form');
+      colorForm.hass = this._hass;
+      colorForm.schema = [{ name: 'icon_color', selector: { ui_color: {} } }];
+      colorForm.data = { icon_color: extra?.icon_color || 'amber' };
+      colorForm.computeLabel = () => 'צבע אייקון';
+      colorForm.addEventListener('value-changed', e => {
+        this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, icon_color: e.detail.value.icon_color } };
+        this._fire();
+      });
+      colorPickerWrap.appendChild(colorForm);
+    }
+
+    r.getElementById('f-extra-icon')?.addEventListener('change', e => {
+      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, icon: e.target.value || undefined } };
+      this._fire();
+    });
+
+    r.getElementById('f-extra-icon-color')?.addEventListener('change', e => {
+      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, icon_color: e.target.value || undefined } };
       this._fire();
     });
 
