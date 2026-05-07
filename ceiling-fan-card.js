@@ -446,6 +446,8 @@ class CeilingFanCardEditor extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el => el.hass = hass);
+    const tapSel = this.shadowRoot.getElementById('f-tap');
+    if (tapSel) tapSel.hass = hass;
   }
 
   _fire() {
@@ -473,7 +475,7 @@ class CeilingFanCardEditor extends HTMLElement {
         <ha-textfield data-speed="${i}" label="מהירות ${i+1}" value="${n}"></ha-textfield>
       </div>`).join('');
 
-    const tapAction = extra?.tap_action?.action || 'toggle';
+    const tapAction = extra?.tap_action || { action: 'toggle' };
 
     wrap.innerHTML = `
       <div class="sec-title">מאוורר</div>
@@ -499,14 +501,13 @@ class CeilingFanCardEditor extends HTMLElement {
           <ha-textfield id="f-extra-name" label="תווית (אופציונלי)" value="${extra?.name || ''}"></ha-textfield>
         </div>
         <div class="field">
-          <label class="field-lbl">tap_action</label>
-          <select id="f-tap">
-            <option value="toggle"       ${tapAction==='toggle'       ?'selected':''}>toggle</option>
-            <option value="more-info"    ${tapAction==='more-info'    ?'selected':''}>more-info</option>
-            <option value="call-service" ${tapAction==='call-service' ?'selected':''}>call-service</option>
-            <option value="navigate"     ${tapAction==='navigate'     ?'selected':''}>navigate</option>
-            <option value="none"         ${tapAction==='none'         ?'selected':''}>none</option>
-          </select>
+          <ha-selector
+            id="f-tap"
+            label="tap_action"
+            .selector=${{ action: {} }}
+            .value=${tapAction}
+            .hass=${this._hass}
+          ></ha-selector>
         </div>
       </div>
     `;
@@ -568,8 +569,8 @@ class CeilingFanCardEditor extends HTMLElement {
       this._fire();
     });
 
-    r.getElementById('f-tap').addEventListener('change', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: { action: e.target.value } } };
+    r.getElementById('f-tap').addEventListener('value-changed', e => {
+      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value } };
       this._fire();
     });
   }
