@@ -65,6 +65,7 @@ const STYLES = `
   .power-btn.on { border-color: rgba(99,102,241,0.6); box-shadow: 0 0 12px rgba(99,102,241,0.3); }
   .power-btn svg { width: 14px; height: 14px; stroke: rgba(255,255,255,0.3); fill: none; stroke-width: 2; stroke-linecap: round; transition: stroke .3s; }
   .power-btn.on svg { stroke: #818cf8; }
+  .btns { display: flex; align-items: center; gap: 8px; }
 
   .fan-center { display: flex; flex-direction: column; align-items: center; gap: 10px; position: relative; margin-bottom: 14px; }
   .fan-glow {
@@ -101,23 +102,18 @@ const STYLES = `
   .bar { width: 3px; border-radius: 2px; background: rgba(255,255,255,0.1); transition: background .2s; }
   .spd-btn.active .bar { background: #818cf8; }
 
-  /* extra entity row */
-  .extra-row {
-    display: flex; align-items: center; gap: 10px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    padding: 10px 6px; margin-bottom: 4px;
-    cursor: pointer; border-radius: 8px; transition: background .2s;
+  /* extra entity — icon button next to power */
+  .btns { display: flex; align-items: center; gap: 8px; }
+  .extra-btn {
+    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid rgba(251,191,36,0.4);
+    background: rgba(251,191,36,0.08);
+    box-shadow: 0 0 10px rgba(251,191,36,0.15);
+    transition: box-shadow .3s;
   }
-  .extra-row:hover { background: rgba(255,255,255,0.03); }
-  .extra-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .3s; }
-  .extra-icon.on { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.3); }
-  .extra-icon svg { width: 15px; height: 15px; stroke: rgba(255,255,255,0.3); fill: none; stroke-width: 1.5; stroke-linecap: round; transition: stroke .3s; }
-  .extra-icon.on svg { stroke: #818cf8; }
-  .extra-info { flex: 1; min-width: 0; }
-  .extra-name { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); }
-  .extra-entity { font-size: 10px; color: rgba(255,255,255,0.2); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .extra-state { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.2); transition: color .3s; flex-shrink: 0; }
-  .extra-state.on { color: #818cf8; }
+  .extra-btn:hover { box-shadow: 0 0 16px rgba(251,191,36,0.28); }
+  .extra-btn svg { width: 15px; height: 15px; fill: none; stroke: #fbbf24; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 `;
 
 const DEFAULT_SPEED_NAMES = ['חלש מאוד', 'חלש', 'בינוני-חלש', 'בינוני', 'חזק', 'חזק מאוד'];
@@ -177,17 +173,7 @@ class CeilingFanCard extends HTMLElement {
       </button>`;
     }).join('');
 
-    const extraHtml = this._extra ? `
-      <div class="extra-row" id="extra-row">
-        <div class="extra-icon" id="extra-icon">
-          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        </div>
-        <div class="extra-info">
-          <div class="extra-name">${this._extra.name || this._extra.entity}</div>
-          <div class="extra-entity">${this._extra.entity}</div>
-        </div>
-        <div class="extra-state" id="extra-state">—</div>
-      </div>` : '';
+
 
     card.innerHTML = `
       <div class="header">
@@ -227,7 +213,7 @@ class CeilingFanCard extends HTMLElement {
       </div>
 
       <div class="controls">${btnHtml}</div>
-      ${extraHtml}
+
     `;
 
     r.appendChild(card);
@@ -237,7 +223,18 @@ class CeilingFanCard extends HTMLElement {
       b.addEventListener('click', () => this._setSpeed(parseInt(b.dataset.idx) + 1))
     );
     if (this._extra) {
-      r.getElementById('extra-row').addEventListener('click', () => this._handleExtraTap());
+      const btn = r.getElementById('extra-btn');
+      if (btn) {
+        btn.addEventListener('click', () => this._handleExtraTap());
+        // Use ha-icon if mdi icon specified
+        if (this._extra.icon) {
+          const haIcon = document.createElement('ha-icon');
+          haIcon.setAttribute('icon', this._extra.icon);
+          haIcon.style.cssText = '--mdc-icon-size:18px; color:#fbbf24;';
+          btn.innerHTML = '';
+          btn.appendChild(haIcon);
+        }
+      }
     }
   }
 
@@ -290,16 +287,7 @@ class CeilingFanCard extends HTMLElement {
   }
 
   _syncExtra() {
-    if (!this._extra) return;
-    const r = this.shadowRoot;
-    const obj = this._hass?.states[this._extra.entity];
-    const icon  = r.getElementById('extra-icon');
-    const state = r.getElementById('extra-state');
-    if (!obj || !icon || !state) return;
-    const isOn = obj.state === 'on';
-    icon.classList.toggle('on', isOn);
-    state.textContent = isOn ? 'פעיל' : 'כבוי';
-    state.classList.toggle('on', isOn);
+    // extra entity is now an icon button — no state display needed
   }
 
   /* ── Fan rotation (JS-driven) ── */
