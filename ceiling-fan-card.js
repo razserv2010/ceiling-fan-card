@@ -113,6 +113,10 @@ const SPEED_META = [
 const SPIN_DURATIONS = [3, 1.8, 1.1, 0.7, 0.45, 0.28];
 const BAR_HEIGHTS    = [3, 5, 7, 9, 11, 13];
 
+// Exact percentages per speed level (avoids rounding drift)
+// speed 1→17%, 2→33%, 3→50%, 4→67%, 5→83%, 6→100%
+const SPEED_PCT = [17, 33, 50, 67, 83, 100];
+
 class CeilingFanCard extends HTMLElement {
   constructor() {
     super();
@@ -215,7 +219,11 @@ class CeilingFanCard extends HTMLElement {
 
     const isOn = obj.state === 'on';
     const pct  = obj.attributes.percentage || 0;
-    const lvl  = isOn ? Math.max(1, Math.round((pct / 100) * this._count)) : 0;
+    // Find closest speed level using fixed percentage table (avoids rounding drift)
+    const lvl = isOn && pct > 0
+      ? SPEED_PCT.slice(0, this._count).reduce((best, p, i) =>
+          Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1)
+      : 0;
 
     const nameEl = this.shadowRoot.getElementById('name');
     if (nameEl) nameEl.textContent = this._name || obj.attributes.friendly_name || 'מאוורר תקרה';
@@ -286,7 +294,7 @@ class CeilingFanCard extends HTMLElement {
   _setSpeed(n) {
     this._hass.callService('fan', 'turn_on', {
       entity_id: this._entity,
-      percentage: Math.round((n / this._count) * 100),
+      percentage: SPEED_PCT[n - 1],
     });
   }
 }
