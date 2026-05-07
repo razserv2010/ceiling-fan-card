@@ -374,21 +374,31 @@ class CeilingFanCard extends HTMLElement {
 
   _handleExtraTap() {
     if (!this._extra || !this._hass) return;
-    const action = this._extra.tap_action?.action || 'toggle';
-    const entity = this._extra.entity;
-    const [domain] = entity.split('.');
+    const tapAction = this._extra.tap_action;
+    const action    = tapAction?.action || 'more-info';
+    const entity    = this._extra.entity;
+    const [domain]  = entity.split('.');
+
     if (action === 'toggle') {
       this._hass.callService(domain, 'toggle', { entity_id: entity });
     } else if (action === 'more-info') {
       this.dispatchEvent(new CustomEvent('hass-more-info', {
         detail: { entityId: entity }, bubbles: true, composed: true
       }));
-    } else if (action === 'call-service') {
-      const [sd, sn] = this._extra.tap_action.service.split('.');
-      this._hass.callService(sd, sn, this._extra.tap_action.service_data || {});
+    } else if (action === 'perform-action' || action === 'call-service') {
+      const svc = tapAction.perform_action || tapAction.service;
+      if (svc) {
+        const [sd, sn] = svc.split('.');
+        this._hass.callService(sd, sn, {
+          ...(tapAction.data || tapAction.service_data || {}),
+          ...(tapAction.target || {}),
+        });
+      }
     } else if (action === 'navigate') {
-      history.pushState(null, '', this._extra.tap_action.navigation_path);
+      history.pushState(null, '', tapAction.navigation_path);
       window.dispatchEvent(new CustomEvent('location-changed', { bubbles: true, composed: true }));
+    } else if (action === 'url') {
+      window.open(tapAction.url_path, '_blank');
     }
   }
 }
@@ -446,8 +456,6 @@ class CeilingFanCardEditor extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el => el.hass = hass);
-    const tapSel = this.shadowRoot.getElementById('f-tap');
-    if (tapSel) tapSel.hass = hass;
   }
 
   _fire() {
@@ -475,8 +483,6 @@ class CeilingFanCardEditor extends HTMLElement {
         <ha-textfield data-speed="${i}" label="מהירות ${i+1}" value="${n}"></ha-textfield>
       </div>`).join('');
 
-    const tapAction = extra?.tap_action || { action: 'toggle' };
-
     wrap.innerHTML = `
       <div class="sec-title">מאוורר</div>
       <div class="field" id="fan-picker-wrap"></div>
@@ -499,15 +505,6 @@ class CeilingFanCardEditor extends HTMLElement {
         <div id="extra-picker-wrap"></div>
         <div class="field">
           <ha-textfield id="f-extra-name" label="תווית (אופציונלי)" value="${extra?.name || ''}"></ha-textfield>
-        </div>
-        <div class="field">
-          <ha-selector
-            id="f-tap"
-            label="tap_action"
-            .selector=${{ action: {} }}
-            .value=${tapAction}
-            .hass=${this._hass}
-          ></ha-selector>
         </div>
       </div>
     `;
@@ -569,10 +566,7 @@ class CeilingFanCardEditor extends HTMLElement {
       this._fire();
     });
 
-    r.getElementById('f-tap').addEventListener('value-changed', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value } };
-      this._fire();
-    });
+
   }
 }
 
