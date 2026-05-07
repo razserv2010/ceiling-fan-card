@@ -377,29 +377,20 @@ class CeilingFanCard extends HTMLElement {
     const tapAction = this._extra.tap_action;
     const action    = tapAction?.action || 'more-info';
     const entity    = this._extra.entity;
-    const [domain]  = entity.split('.');
 
-    if (action === 'toggle') {
-      this._hass.callService(domain, 'toggle', { entity_id: entity });
-    } else if (action === 'more-info') {
-      this.dispatchEvent(new CustomEvent('hass-more-info', {
-        detail: { entityId: entity }, bubbles: true, composed: true
-      }));
-    } else if (action === 'perform-action' || action === 'call-service') {
-      const svc = tapAction.perform_action || tapAction.service;
-      if (svc) {
-        const [sd, sn] = svc.split('.');
-        this._hass.callService(sd, sn, {
-          ...(tapAction.data || tapAction.service_data || {}),
-          ...(tapAction.target || {}),
-        });
-      }
-    } else if (action === 'navigate') {
-      history.pushState(null, '', tapAction.navigation_path);
-      window.dispatchEvent(new CustomEvent('location-changed', { bubbles: true, composed: true }));
-    } else if (action === 'url') {
-      window.open(tapAction.url_path, '_blank');
-    }
+    // Use the same action handler as HA built-in cards
+    const event = new CustomEvent('hass-action', {
+      bubbles: true,
+      composed: true,
+      detail: {
+        config: {
+          entity: entity,
+          tap_action: tapAction,
+        },
+        action: 'tap',
+      },
+    });
+    this.dispatchEvent(event);
   }
 }
 
