@@ -193,7 +193,7 @@ class CeilingFanCard extends HTMLElement {
       <div class="header">
         <div>
           <div class="title" id="name">מאוורר תקרה</div>
-          <div class="sub">בקרת אקלים</div>
+
         </div>
         <button class="power-btn" id="power">
           <svg viewBox="0 0 24 24"><path d="M12 2v6M6.3 6.3A8 8 0 1 0 17.7 6.3"/></svg>
@@ -423,6 +423,15 @@ const EDITOR_STYLES = `
     border-radius: 8px;
   }
   ha-entity-picker { width: 100%; display: block; margin-bottom: 12px; }
+  .field-lbl { font-size: 12px; color: var(--secondary-text-color); display: block; margin-bottom: 4px; }
+  select {
+    width: 100%; padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--divider-color);
+    background: var(--secondary-background-color);
+    color: var(--primary-text-color);
+    font-size: 14px; cursor: pointer;
+  }
 `;
 
 class CeilingFanCardEditor extends HTMLElement {
@@ -464,6 +473,8 @@ class CeilingFanCardEditor extends HTMLElement {
         <ha-textfield data-speed="${i}" label="מהירות ${i+1}" value="${n}"></ha-textfield>
       </div>`).join('');
 
+    const tapAction = extra?.tap_action?.action || 'toggle';
+
     wrap.innerHTML = `
       <div class="sec-title">מאוורר</div>
       <div class="field" id="fan-picker-wrap"></div>
@@ -488,13 +499,14 @@ class CeilingFanCardEditor extends HTMLElement {
           <ha-textfield id="f-extra-name" label="תווית (אופציונלי)" value="${extra?.name || ''}"></ha-textfield>
         </div>
         <div class="field">
-          <ha-select id="f-tap" label="tap_action">
-            <mwc-list-item value="toggle"       ${(extra?.tap_action?.action||'toggle')==='toggle'       ?'selected':''}>toggle</mwc-list-item>
-            <mwc-list-item value="more-info"    ${(extra?.tap_action?.action||'')==='more-info'          ?'selected':''}>more-info</mwc-list-item>
-            <mwc-list-item value="call-service" ${(extra?.tap_action?.action||'')==='call-service'       ?'selected':''}>call-service</mwc-list-item>
-            <mwc-list-item value="navigate"     ${(extra?.tap_action?.action||'')==='navigate'           ?'selected':''}>navigate</mwc-list-item>
-            <mwc-list-item value="none"         ${(extra?.tap_action?.action||'')==='none'               ?'selected':''}>none</mwc-list-item>
-          </ha-select>
+          <label class="field-lbl">tap_action</label>
+          <select id="f-tap">
+            <option value="toggle"       ${tapAction==='toggle'       ?'selected':''}>toggle</option>
+            <option value="more-info"    ${tapAction==='more-info'    ?'selected':''}>more-info</option>
+            <option value="call-service" ${tapAction==='call-service' ?'selected':''}>call-service</option>
+            <option value="navigate"     ${tapAction==='navigate'     ?'selected':''}>navigate</option>
+            <option value="none"         ${tapAction==='none'         ?'selected':''}>none</option>
+          </select>
         </div>
       </div>
     `;
@@ -556,8 +568,8 @@ class CeilingFanCardEditor extends HTMLElement {
       this._fire();
     });
 
-    r.getElementById('f-tap').addEventListener('selected', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: { action: e.detail.value } } };
+    r.getElementById('f-tap').addEventListener('change', e => {
+      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: { action: e.target.value } } };
       this._fire();
     });
   }
