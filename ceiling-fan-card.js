@@ -162,6 +162,47 @@ const CARD_STYLES = `
   .bars { display: flex; gap: 1.5px; align-items: flex-end; height: 10px; }
   .bar { width: 3px; border-radius: 2px; background: var(--fan-divider); transition: background .2s; }
   .spd-btn.active .bar { background: var(--fan-accent); }
+
+  /* ── Preset dropdown ── */
+  .preset-section { border-top: 1px solid var(--fan-divider); padding-top: 10px; margin-top: 4px; }
+
+  .preset-trigger {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; border-radius: 10px;
+    border: 1px solid var(--fan-divider);
+    background: var(--fan-bg2);
+    cursor: pointer; transition: all .2s; user-select: none;
+  }
+  .preset-trigger:hover { border-color: var(--fan-accent); }
+
+  .preset-trigger-left { display: flex; align-items: center; gap: 8px; }
+  .preset-trigger-icon { width: 18px; height: 18px; stroke: var(--fan-subtext); fill: none; stroke-width: 1.5; stroke-linecap: round; flex-shrink: 0; }
+  .preset-selected { font-size: 13px; font-weight: 600; color: var(--fan-text); }
+  .preset-arrow { width: 16px; height: 16px; stroke: var(--fan-subtext); fill: none; stroke-width: 2; stroke-linecap: round; transition: transform .2s; flex-shrink: 0; }
+  .preset-arrow.open { transform: rotate(180deg); }
+
+  .preset-list {
+    margin-top: 4px; border-radius: 10px;
+    border: 1px solid var(--fan-divider);
+    background: var(--ha-card-background, var(--card-background-color));
+    overflow: hidden; display: none;
+  }
+  .preset-list.open { display: block; }
+
+  .preset-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; cursor: pointer;
+    border-bottom: 1px solid var(--fan-divider);
+    transition: background .15s;
+  }
+  .preset-item:last-child { border: none; }
+  .preset-item:hover { background: color-mix(in srgb, var(--fan-accent) 8%, transparent); }
+  .preset-item.active { background: color-mix(in srgb, var(--fan-accent) 12%, transparent); }
+
+  .preset-item-name { font-size: 13px; font-weight: 600; color: var(--fan-text); }
+  .preset-item.active .preset-item-name { color: var(--fan-accent); }
+  .preset-check { width: 14px; height: 14px; stroke: var(--fan-accent); fill: none; stroke-width: 2.5; stroke-linecap: round; opacity: 0; }
+  .preset-item.active .preset-check { opacity: 1; }
 `;
 
 const DEFAULT_SPEED_NAMES = ['חלש מאוד', 'חלש', 'בינוני-חלש', 'בינוני', 'חזק', 'חזק מאוד'];
@@ -258,7 +299,17 @@ class CeilingFanCard extends HTMLElement {
         '</svg>' +
         '<div class="speed-name off" id="spname">כבוי</div>' +
       '</div>' +
-      '<div class="controls">' + btnHtml + '</div>';
+      '<div class="controls">' + btnHtml + '</div>' +
+      '<div class="preset-section" id="preset-section" style="display:none">' +
+        '<div class="preset-trigger" id="preset-trigger">' +
+          '<div class="preset-trigger-left">' +
+            '<svg class="preset-trigger-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>' +
+            '<span class="preset-selected" id="preset-selected"></span>' +
+          '</div>' +
+          '<svg class="preset-arrow" id="preset-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</div>' +
+        '<div class="preset-list" id="preset-list"></div>' +
+      '</div>';
 
     r.appendChild(card);
 
@@ -266,6 +317,13 @@ class CeilingFanCard extends HTMLElement {
     r.querySelectorAll('.spd-btn').forEach(b =>
       b.addEventListener('click', () => this._setSpeed(parseInt(b.dataset.idx) + 1))
     );
+
+    r.getElementById('preset-trigger')?.addEventListener('click', () => {
+      const list = r.getElementById('preset-list');
+      const arrow = r.getElementById('preset-arrow');
+      list.classList.toggle('open');
+      arrow.classList.toggle('open');
+    });
 
     this._buildExtraBtn();
   }
@@ -335,6 +393,7 @@ class CeilingFanCard extends HTMLElement {
 
     this._updateUI(isOn, lvl);
     this._buildExtraBtn();
+    this._syncPresets(obj);
 
     // Apply light mode adjustments if needed
   }
@@ -353,6 +412,59 @@ class CeilingFanCard extends HTMLElement {
       card.style.removeProperty('--fan-bg2');
       card.style.removeProperty('--fan-disabled');
     }
+  }
+
+  _syncPresets(obj) {
+    const r = this.shadowRoot;
+    const section = r.getElementById('preset-section');
+    const list    = r.getElementById('preset-list');
+    const selected = r.getElementById('preset-selected');
+    if (!section || !list || !selected) return;
+
+    // Get preset_modes — exclude speed-related presets (כבוי + the 6 speed names)
+    const allPresets  = obj.attributes.preset_modes || [];
+    const speedNames  = new Set([...this._speedNames, 'כבוי', 'off']);
+    const presets     = allPresets.filter(p => !speedNames.has(p));
+
+    if (presets.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    const currentPreset = obj.attributes.preset_mode || '';
+
+    // Rebuild list only if presets changed
+    const existing = [...list.querySelectorAll('.preset-item')].map(el => el.dataset.preset);
+    if (JSON.stringify(existing) !== JSON.stringify(presets)) {
+      list.innerHTML = '';
+      presets.forEach(preset => {
+        const item = document.createElement('div');
+        item.className = 'preset-item' + (preset === currentPreset ? ' active' : '');
+        item.dataset.preset = preset;
+        item.innerHTML =
+          '<span class="preset-item-name">' + preset + '</span>' +
+          '<svg class="preset-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+        item.addEventListener('click', () => {
+          this._hass.callService('fan', 'turn_on', {
+            entity_id: this._entity,
+            preset_mode: preset,
+          });
+          list.classList.remove('open');
+          r.getElementById('preset-arrow')?.classList.remove('open');
+        });
+        list.appendChild(item);
+      });
+    } else {
+      // Just update active state
+      list.querySelectorAll('.preset-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.preset === currentPreset);
+      });
+    }
+
+    // Update selected label
+    const activePreset = presets.includes(currentPreset) ? currentPreset : presets[0];
+    selected.textContent = activePreset;
   }
 
   _updateUI(isOn, lvl) {
