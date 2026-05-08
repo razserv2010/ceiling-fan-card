@@ -953,24 +953,19 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     row.appendChild(form);
 
-    // tap_action via hui-action-editor
-    const actionTitle = document.createElement('div');
-    actionTitle.style.cssText = 'font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--secondary-text-color);margin:10px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--divider-color)';
-    actionTitle.textContent = 'אינטראקציה';
-    row.appendChild(actionTitle);
-
-    const actionEditor = document.createElement('hui-action-editor');
-    actionEditor.hass    = this._hass;
-    actionEditor.label   = 'התנהגות בהקשה';
-    actionEditor.value   = cfg.tap_action || { action: 'toggle' };
-    actionEditor.actions = ['more-info', 'toggle', 'navigate', 'url', 'perform-action', 'assist', 'none'];
-    actionEditor.addEventListener('value-changed', e => {
+    // tap_action via ha-form with action selector
+    const actionForm = document.createElement('ha-form');
+    actionForm.hass   = this._hass;
+    actionForm.schema = [{ name: 'tap_action', selector: { action: {} } }];
+    actionForm.data   = { tap_action: cfg.tap_action || { action: 'toggle' } };
+    actionForm.computeLabel = () => 'התנהגות בהקשה';
+    actionForm.addEventListener('value-changed', e => {
       const updated = [...(this._config.entities || [])];
-      updated[i] = { ...updated[i], tap_action: e.detail.value };
+      updated[i] = { ...updated[i], tap_action: e.detail.value.tap_action };
       this._config = { ...this._config, entities: updated };
       this._fire();
     });
-    row.appendChild(actionEditor);
+    row.appendChild(actionForm);
 
     return row;
   }
