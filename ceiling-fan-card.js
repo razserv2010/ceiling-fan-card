@@ -960,9 +960,9 @@ class CeilingFanCardEditor extends HTMLElement {
     row.appendChild(actionTitle);
 
     const actionEditor = document.createElement('hui-action-editor');
-    actionEditor.hass   = this._hass;
-    actionEditor.label  = 'התנהגות בהקשה';
-    actionEditor.config = cfg.tap_action || { action: 'toggle' };
+    actionEditor.hass    = this._hass;
+    actionEditor.label   = 'התנהגות בהקשה';
+    actionEditor.value   = cfg.tap_action || { action: 'toggle' };
     actionEditor.actions = ['more-info', 'toggle', 'navigate', 'url', 'perform-action', 'assist', 'none'];
     actionEditor.addEventListener('value-changed', e => {
       const updated = [...(this._config.entities || [])];
