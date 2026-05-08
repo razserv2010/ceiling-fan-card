@@ -247,23 +247,38 @@ const CARD_STYLES = `
 
   .entity-chevron { width: 16px; height: 16px; flex-shrink: 0; stroke: var(--fan-subtext); fill: none; stroke-width: 2; stroke-linecap: round; }
 
-  .entity-select {
-    appearance: none; -webkit-appearance: none;
-    background: var(--fan-bg2);
+  .custom-select { position: relative; flex-shrink: 0; }
+  .custom-select-trigger {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 8px; border-radius: 8px;
     border: 1px solid var(--fan-divider);
-    border-radius: 8px;
-    color: var(--fan-text);
-    font-family: 'Heebo', sans-serif;
-    font-size: 12px; font-weight: 600;
-    padding: 4px 24px 4px 10px;
-    cursor: pointer; outline: none; direction: rtl;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: left 6px center;
-    transition: border-color .2s;
-    max-width: 120px;
+    background: var(--fan-bg2);
+    cursor: pointer; user-select: none;
+    transition: border-color .2s; min-width: 70px;
   }
-  .entity-select:focus { border-color: var(--fan-accent); }
+  .custom-select-trigger:hover { border-color: var(--fan-accent); }
+  .custom-select-trigger.open { border-color: var(--fan-accent); }
+  .custom-select-value { font-size: 12px; font-weight: 600; color: var(--fan-text); flex: 1; }
+  .custom-select-arrow { width: 12px; height: 12px; stroke: var(--fan-subtext); fill: none; stroke-width: 2; stroke-linecap: round; transition: transform .2s; flex-shrink: 0; }
+  .custom-select-trigger.open .custom-select-arrow { transform: rotate(180deg); }
+  .custom-select-list {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--ha-card-background, var(--card-background-color, #1a1d2e));
+    border: 1px solid color-mix(in srgb, var(--fan-accent) 40%, transparent);
+    border-radius: 10px; overflow: hidden; z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    display: none; min-width: 100px;
+  }
+  .custom-select-list.open { display: block; }
+  .custom-select-option {
+    padding: 8px 12px; font-size: 12px; font-weight: 600;
+    color: var(--fan-text); cursor: pointer;
+    transition: background .15s;
+    border-bottom: 1px solid var(--fan-divider);
+  }
+  .custom-select-option:last-child { border: none; }
+  .custom-select-option:hover { background: color-mix(in srgb, var(--fan-accent) 10%, transparent); }
+  .custom-select-option.active { color: var(--fan-accent); background: color-mix(in srgb, var(--fan-accent) 15%, transparent); }
 `;
 
 const DEFAULT_SPEED_NAMES = ['חלש מאוד', 'חלש', 'בינוני-חלש', 'בינוני', 'חזק', 'חזק מאוד'];
@@ -582,25 +597,62 @@ class CeilingFanCard extends HTMLElement {
           nameEl.textContent = name;
           row.appendChild(nameEl);
 
-          // Inline dropdown
-          const sel = document.createElement('select');
-          sel.className = 'entity-select';
-          sel.id = id + '-select';
+          // Custom dropdown
+          const wrap = document.createElement('div');
+          wrap.className = 'custom-select';
+          wrap.id = id + '-select-wrap';
+
+          const trigger = document.createElement('div');
+          trigger.className = 'custom-select-trigger';
+          const valSpan = document.createElement('span');
+          valSpan.className = 'custom-select-value';
+          valSpan.id = id + '-select-val';
+          valSpan.textContent = obj?.state || '';
+          const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          arrow.setAttribute('viewBox', '0 0 24 24');
+          arrow.setAttribute('class', 'custom-select-arrow');
+          arrow.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
+          trigger.appendChild(valSpan);
+          trigger.appendChild(arrow);
+
+          const list = document.createElement('div');
+          list.className = 'custom-select-list';
+          list.id = id + '-select-list';
+
           const options = obj?.attributes?.options || [];
           options.forEach(opt => {
-            const o = document.createElement('option');
-            o.value = opt; o.textContent = opt;
-            if (opt === obj?.state) o.selected = true;
-            sel.appendChild(o);
-          });
-          sel.addEventListener('change', e => {
-            e.stopPropagation();
-            this._hass.callService(domain, 'select_option', {
-              entity_id: cfg.entity,
-              option: e.target.value,
+            const item = document.createElement('div');
+            item.className = 'custom-select-option' + (opt === obj?.state ? ' active' : '');
+            item.textContent = opt;
+            item.addEventListener('click', e => {
+              e.stopPropagation();
+              this._hass.callService(domain, 'select_option', {
+                entity_id: cfg.entity, option: opt,
+              });
+              list.classList.remove('open');
+              trigger.classList.remove('open');
             });
+            list.appendChild(item);
           });
-          row.appendChild(sel);
+
+          trigger.addEventListener('click', e => {
+            e.stopPropagation();
+            const isOpen = list.classList.contains('open');
+            // Close all other selects
+            r.querySelectorAll('.custom-select-list').forEach(l => l.classList.remove('open'));
+            r.querySelectorAll('.custom-select-trigger').forEach(t => t.classList.remove('open'));
+            if (!isOpen) { list.classList.add('open'); trigger.classList.add('open'); }
+          });
+
+          wrap.appendChild(trigger);
+          wrap.appendChild(list);
+          row.appendChild(wrap);
+
+          // Close on outside click
+          this.shadowRoot.addEventListener('click', () => {
+            list.classList.remove('open');
+            trigger.classList.remove('open');
+          });
         } else {
           const info = document.createElement('div');
           info.className = 'entity-info';
@@ -628,8 +680,12 @@ class CeilingFanCard extends HTMLElement {
       } else {
         // Update
         if (isSelect) {
-          const sel = r.getElementById(id + '-select');
-          if (sel && obj?.state) sel.value = obj.state;
+          const valEl = r.getElementById(id + '-select-val');
+          if (valEl && obj?.state) valEl.textContent = obj.state;
+          const listEl = r.getElementById(id + '-select-list');
+          if (listEl) listEl.querySelectorAll('.custom-select-option').forEach(o => {
+            o.classList.toggle('active', o.textContent === obj?.state);
+          });
         } else {
           const iconWrap = r.getElementById(id + '-icon');
           if (iconWrap) iconWrap.className = 'entity-icon-wrap' + (isOn ? ' on' : '');
