@@ -246,6 +246,24 @@ const CARD_STYLES = `
   .entity-toggle.on .entity-toggle-thumb { left: 19px; }
 
   .entity-chevron { width: 16px; height: 16px; flex-shrink: 0; stroke: var(--fan-subtext); fill: none; stroke-width: 2; stroke-linecap: round; }
+
+  .entity-select {
+    appearance: none; -webkit-appearance: none;
+    background: var(--fan-bg2);
+    border: 1px solid var(--fan-divider);
+    border-radius: 8px;
+    color: var(--fan-text);
+    font-family: 'Heebo', sans-serif;
+    font-size: 12px; font-weight: 600;
+    padding: 4px 24px 4px 10px;
+    cursor: pointer; outline: none; direction: rtl;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: left 6px center;
+    transition: border-color .2s;
+    max-width: 120px;
+  }
+  .entity-select:focus { border-color: var(--fan-accent); }
 `;
 
 const DEFAULT_SPEED_NAMES = ['חלש מאוד', 'חלש', 'בינוני-חלש', 'בינוני', 'חזק', 'חזק מאוד'];
@@ -538,12 +556,12 @@ class CeilingFanCard extends HTMLElement {
       const isOn = obj?.state === 'on' || obj?.state === 'true';
       const domain = cfg.entity.split('.')[0];
       const isToggleable = ['switch','light','input_boolean','fan','automation'].includes(domain);
+      const isSelect = ['select','input_select'].includes(domain);
       const name = cfg.name || obj?.attributes?.friendly_name || cfg.entity;
       const icon = cfg.icon || obj?.attributes?.icon || this._defaultIcon(domain);
       const stateLabel = isOn ? 'פועל' : (obj ? 'כבוי' : 'לא זמין');
 
       if (!row) {
-        // Build row
         row = document.createElement('div');
         row.className = 'entity-row';
         row.id = id;
@@ -554,42 +572,72 @@ class CeilingFanCard extends HTMLElement {
         const haIcon = document.createElement('ha-icon');
         haIcon.setAttribute('icon', icon);
         iconWrap.appendChild(haIcon);
-
-        const info = document.createElement('div');
-        info.className = 'entity-info';
-        info.innerHTML = '<div class="entity-name">' + name + '</div><div class="entity-state' + (isOn?' on':'') + '" id="' + id + '-state">' + stateLabel + '</div>';
-
         row.appendChild(iconWrap);
-        row.appendChild(info);
 
-        if (isToggleable) {
-          const toggle = document.createElement('button');
-          toggle.className = 'entity-toggle' + (isOn ? ' on' : '');
-          toggle.id = id + '-toggle';
-          toggle.innerHTML = '<div class="entity-toggle-thumb"></div>';
-          toggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this._tapEntity(cfg);
+        if (isSelect) {
+          // Name only (no state below)
+          const nameEl = document.createElement('div');
+          nameEl.className = 'entity-name';
+          nameEl.style.flex = '1';
+          nameEl.textContent = name;
+          row.appendChild(nameEl);
+
+          // Inline dropdown
+          const sel = document.createElement('select');
+          sel.className = 'entity-select';
+          sel.id = id + '-select';
+          const options = obj?.attributes?.options || [];
+          options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt; o.textContent = opt;
+            if (opt === obj?.state) o.selected = true;
+            sel.appendChild(o);
           });
-          row.appendChild(toggle);
+          sel.addEventListener('change', e => {
+            e.stopPropagation();
+            this._hass.callService(domain, 'select_option', {
+              entity_id: cfg.entity,
+              option: e.target.value,
+            });
+          });
+          row.appendChild(sel);
         } else {
-          const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          chevron.setAttribute('viewBox', '0 0 24 24');
-          chevron.setAttribute('class', 'entity-chevron');
-          chevron.innerHTML = '<polyline points="9 18 15 12 9 6"/>';
-          row.appendChild(chevron);
+          const info = document.createElement('div');
+          info.className = 'entity-info';
+          info.innerHTML = '<div class="entity-name">' + name + '</div><div class="entity-state' + (isOn?' on':'') + '" id="' + id + '-state">' + stateLabel + '</div>';
+          row.appendChild(info);
+
+          if (isToggleable) {
+            const toggle = document.createElement('button');
+            toggle.className = 'entity-toggle' + (isOn ? ' on' : '');
+            toggle.id = id + '-toggle';
+            toggle.innerHTML = '<div class="entity-toggle-thumb"></div>';
+            toggle.addEventListener('click', e => { e.stopPropagation(); this._tapEntity(cfg); });
+            row.appendChild(toggle);
+          } else {
+            const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            chevron.setAttribute('viewBox', '0 0 24 24');
+            chevron.setAttribute('class', 'entity-chevron');
+            chevron.innerHTML = '<polyline points="9 18 15 12 9 6"/>';
+            row.appendChild(chevron);
+          }
+          row.addEventListener('click', () => this._tapEntity(cfg));
         }
 
-        row.addEventListener('click', () => this._tapEntity(cfg));
         section.appendChild(row);
       } else {
-        // Update existing row
-        const iconWrap = r.getElementById(id + '-icon');
-        if (iconWrap) iconWrap.className = 'entity-icon-wrap' + (isOn ? ' on' : '');
-        const stateEl = r.getElementById(id + '-state');
-        if (stateEl) { stateEl.textContent = stateLabel; stateEl.className = 'entity-state' + (isOn ? ' on' : ''); }
-        const toggleEl = r.getElementById(id + '-toggle');
-        if (toggleEl) { toggleEl.className = 'entity-toggle' + (isOn ? ' on' : ''); }
+        // Update
+        if (isSelect) {
+          const sel = r.getElementById(id + '-select');
+          if (sel && obj?.state) sel.value = obj.state;
+        } else {
+          const iconWrap = r.getElementById(id + '-icon');
+          if (iconWrap) iconWrap.className = 'entity-icon-wrap' + (isOn ? ' on' : '');
+          const stateEl = r.getElementById(id + '-state');
+          if (stateEl) { stateEl.textContent = stateLabel; stateEl.className = 'entity-state' + (isOn ? ' on' : ''); }
+          const toggleEl = r.getElementById(id + '-toggle');
+          if (toggleEl) toggleEl.className = 'entity-toggle' + (isOn ? ' on' : '');
+        }
       }
     });
   }
@@ -608,10 +656,35 @@ class CeilingFanCard extends HTMLElement {
     if (!this._hass) return;
     const domain = cfg.entity.split('.')[0];
     const tapAction = cfg.tap_action || defaultTapAction(domain);
-    this.dispatchEvent(new CustomEvent('hass-action', {
-      bubbles: true, composed: true,
-      detail: { config: { entity: cfg.entity, tap_action: tapAction }, action: 'tap' },
-    }));
+    const action = tapAction?.action || 'more-info';
+
+    if (action === 'more-info') {
+      // Direct more-info — most reliable way
+      this.dispatchEvent(new CustomEvent('hass-more-info', {
+        bubbles: true, composed: true,
+        detail: { entityId: cfg.entity },
+      }));
+    } else if (action === 'toggle') {
+      this._hass.callService(domain, 'toggle', { entity_id: cfg.entity });
+    } else if (action === 'perform-action' || action === 'call-service') {
+      const svc = tapAction.perform_action || tapAction.service;
+      if (svc) {
+        const [sd, sn] = svc.split('.');
+        this._hass.callService(sd, sn, {
+          ...(tapAction.data || tapAction.service_data || {}),
+          ...(tapAction.target || {}),
+        });
+      }
+    } else if (action === 'navigate') {
+      history.pushState(null, '', tapAction.navigation_path);
+      window.dispatchEvent(new CustomEvent('location-changed', { bubbles: true, composed: true }));
+    } else {
+      // Fallback — fire hass-action
+      this.dispatchEvent(new CustomEvent('hass-action', {
+        bubbles: true, composed: true,
+        detail: { config: { entity: cfg.entity, tap_action: tapAction }, action: 'tap' },
+      }));
+    }
   }
 
 
@@ -746,12 +819,9 @@ class CeilingFanCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    // Re-render if not yet rendered (hass arrives before/after setConfig)
-    if (!this.shadowRoot.querySelector('.root')) {
-      this._render();
-    }
-    this.shadowRoot.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker, hui-action-editor')
-      .forEach(el => { el.hass = hass; });
+    if (!this.shadowRoot.querySelector('.root')) { this._render(); }
+    this.shadowRoot.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker, ha-yaml-editor')
+      .forEach(el => { if (el.hass !== undefined) el.hass = hass; });
   }
 
   _fire() {
@@ -780,8 +850,7 @@ class CeilingFanCardEditor extends HTMLElement {
     mainForm.data = { entity: this._config.entity || '', name: this._config.name || '' };
     mainForm.computeLabel = s => ({ entity: 'ישות מאוורר', name: 'שם מותאם' })[s.name] || s.name;
     mainForm.addEventListener('value-changed', e => {
-      this._config = { ...this._config, ...e.detail.value };
-      this._fire();
+      this._config = { ...this._config, ...e.detail.value }; this._fire();
     });
     root.appendChild(mainForm);
 
@@ -799,15 +868,14 @@ class CeilingFanCardEditor extends HTMLElement {
     speedForm.computeLabel = s => 'מהירות ' + s.name.replace('speed_', '');
     speedForm.addEventListener('value-changed', e => {
       const updated = names.map((_, i) => e.detail.value['speed_' + (i+1)] || DEFAULT_SPEED_NAMES[i]);
-      this._config = { ...this._config, speed_names: updated };
-      this._fire();
+      this._config = { ...this._config, speed_names: updated }; this._fire();
     });
     root.appendChild(speedForm);
 
     // Extra entity
     const extraTitle = document.createElement('div');
     extraTitle.className = 'section-title';
-    extraTitle.textContent = 'ישות נוספת';
+    extraTitle.textContent = 'ישות נוספת (כפתור)';
     root.appendChild(extraTitle);
 
     const extra = this._config.extra_entity || null;
@@ -821,8 +889,7 @@ class CeilingFanCardEditor extends HTMLElement {
         const { extra_entity, ...rest } = this._config;
         this._config = rest;
       }
-      this._fire();
-      this._render();
+      this._fire(); this._render();
     });
     root.appendChild(extraToggle);
 
@@ -834,59 +901,53 @@ class CeilingFanCardEditor extends HTMLElement {
       extraForm.hass = this._hass;
       extraForm.schema = [
         { name: 'entity', required: true, selector: { entity: {} } },
-        { name: 'name', selector: { text: {} } },
-        { name: 'icon', selector: { icon: {} } },
+        { name: 'name',   selector: { text: {} } },
+        { name: 'icon',   selector: { icon: {} } },
         { name: 'icon_color', selector: { ui_color: {} } },
       ];
       extraForm.data = {
-        entity: extra.entity || '',
-        name: extra.name || '',
-        icon: extra.icon || '',
-        icon_color: extra.icon_color || '',
+        entity: extra.entity || '', name: extra.name || '',
+        icon: extra.icon || '', icon_color: extra.icon_color || '',
       };
-      extraForm.computeLabel = s => ({ entity: 'ישות', name: 'שם תווית', icon: 'אייקון', icon_color: 'צבע אייקון' })[s.name] || s.name;
+      extraForm.computeLabel = s => ({ entity: 'ישות', name: 'שם תווית', icon: 'אייקון', icon_color: 'צבע' })[s.name] || s.name;
       extraForm.addEventListener('value-changed', e => {
         this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, ...e.detail.value } };
         this._fire();
       });
       extraBlock.appendChild(extraForm);
 
-      const actionTitle = document.createElement('div');
-      actionTitle.className = 'section-title';
-      actionTitle.textContent = 'אינטראקציה';
-      actionTitle.style.marginTop = '12px';
-      extraBlock.appendChild(actionTitle);
+      // tap_action via yaml editor
+      const tapLabel = document.createElement('div');
+      tapLabel.style.cssText = 'font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--secondary-text-color);margin:10px 0 4px;padding-bottom:4px;border-bottom:1px solid var(--divider-color)';
+      tapLabel.textContent = 'tap_action';
+      extraBlock.appendChild(tapLabel);
 
-      const actionEditor = document.createElement('hui-action-editor');
-      actionEditor.hass = this._hass;
-      actionEditor.label = 'התנהגות בהקשה';
-      actionEditor.config = extra.tap_action || { action: 'more-info' };
-      actionEditor.actions = ['more-info', 'toggle', 'navigate', 'url', 'perform-action', 'assist', 'none'];
-      actionEditor.addEventListener('value-changed', e => {
+      const extraYaml = document.createElement('ha-yaml-editor');
+      extraYaml.defaultValue = extra.tap_action || { action: 'more-info' };
+      extraYaml.addEventListener('value-changed', e => {
+        if (!e.detail.isValid) return;
         this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value } };
         this._fire();
       });
-      extraBlock.appendChild(actionEditor);
+      extraBlock.appendChild(extraYaml);
 
       root.appendChild(extraBlock);
     }
 
-    // Entities section via ha-form with entity_list selector
+    // Entities list
     const entitiesTitle = document.createElement('div');
     entitiesTitle.className = 'section-title';
     entitiesTitle.textContent = 'ישויות נוספות';
     root.appendChild(entitiesTitle);
 
     const entities = this._config.entities || [];
-
-    // Build each entity row
     const entitiesContainer = document.createElement('div');
     entities.forEach((cfg, i) => {
       entitiesContainer.appendChild(this._buildEntityRow(cfg, i));
     });
     root.appendChild(entitiesContainer);
 
-    // Add entity button — opens ha-entity-picker inline
+    // Add entity picker
     const addWrap = document.createElement('div');
     addWrap.style.cssText = 'margin-top:8px';
     const newPicker = document.createElement('ha-entity-picker');
@@ -898,25 +959,21 @@ class CeilingFanCardEditor extends HTMLElement {
       if (!e.detail.value) return;
       const updated = [...(this._config.entities || []), { entity: e.detail.value }];
       this._config = { ...this._config, entities: updated };
-      this._fire();
-      this._render();
+      this._fire(); this._render();
     });
     addWrap.appendChild(newPicker);
     root.appendChild(addWrap);
 
     r.appendChild(root);
 
-    // Forward hass AFTER DOM is ready — critical for hui-action-editor
     if (this._hass) {
-      r.querySelectorAll('ha-form, hui-action-editor, ha-entity-picker, ha-icon-picker').forEach(el => {
-        el.hass = this._hass;
-      });
+      r.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker').forEach(el => { el.hass = this._hass; });
     }
   }
 
   _buildEntityRow(cfg, i) {
     const row = document.createElement('div');
-    row.style.cssText = 'border:1px solid var(--divider-color);border-radius:8px;padding:10px;margin-bottom:8px;position:relative';
+    row.style.cssText = 'border:1px solid var(--divider-color);border-radius:8px;padding:12px 12px 8px;margin-bottom:8px;position:relative';
 
     // Delete button
     const delBtn = document.createElement('button');
@@ -929,24 +986,19 @@ class CeilingFanCardEditor extends HTMLElement {
       const updated = [...(this._config.entities || [])];
       updated.splice(i, 1);
       this._config = { ...this._config, entities: updated };
-      this._fire();
-      this._render();
+      this._fire(); this._render();
     });
     row.appendChild(delBtn);
 
-    // Entity form
+    // Entity + name + icon
     const form = document.createElement('ha-form');
-    form.hass = this._hass;
+    form.hass   = this._hass;
     form.schema = [
-      { name: 'entity',    required: true, selector: { entity: {} } },
-      { name: 'name',      selector: { text: {} } },
-      { name: 'icon',      selector: { icon: {} } },
+      { name: 'entity', required: true, selector: { entity: {} } },
+      { name: 'name',   selector: { text: {} } },
+      { name: 'icon',   selector: { icon: {} } },
     ];
-    form.data = {
-      entity: cfg.entity || '',
-      name:   cfg.name   || '',
-      icon:   cfg.icon   || '',
-    };
+    form.data = { entity: cfg.entity || '', name: cfg.name || '', icon: cfg.icon || '' };
     form.computeLabel = s => ({ entity: 'ישות', name: 'שם תווית', icon: 'אייקון' })[s.name] || s.name;
     form.addEventListener('value-changed', e => {
       const updated = [...(this._config.entities || [])];
@@ -955,25 +1007,6 @@ class CeilingFanCardEditor extends HTMLElement {
       this._fire();
     });
     row.appendChild(form);
-
-    // tap_action via ha-form with action selector
-    const actionForm = document.createElement('ha-form');
-    actionForm.hass   = this._hass;
-    actionForm.schema = [{ name: 'tap_action', selector: { action: {} } }];
-    const domain = cfg.entity ? cfg.entity.split('.')[0] : '';
-    actionForm.data   = { tap_action: cfg.tap_action || defaultTapAction(domain) };
-    actionForm.computeLabel = () => 'התנהגות בהקשה';
-    actionForm.addEventListener('value-changed', e => {
-      console.log('action value-changed:', JSON.stringify(e.detail.value));
-      const val = e.detail.value;
-      // ha-form returns { tap_action: {...} } OR just the action object directly
-      const tapAction = val?.tap_action !== undefined ? val.tap_action : val;
-      const updated = [...(this._config.entities || [])];
-      updated[i] = { ...updated[i], tap_action: tapAction };
-      this._config = { ...this._config, entities: updated };
-      this._fire();
-    });
-    row.appendChild(actionForm);
 
     return row;
   }
@@ -986,6 +1019,6 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'ceiling-fan-card',
   name: 'Ceiling Fan Card',
-  description: 'כרטיס מאוורר תקרה — 3 להבים, עצירה הדרגתית, ישות נוספת',
+  description: 'כרטיס מאוורר תקרה — 3 להבים, עצירה הדרגתית, ישויות נוספות',
   preview: true,
 });
