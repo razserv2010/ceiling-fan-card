@@ -128,8 +128,7 @@ class CeilingFanCard extends HTMLElement {
     style.textContent = CARD_STYLES;
     r.appendChild(style);
 
-    const card = document.createElement('div');
-    card.className = 'card-root';
+    const card = document.createElement('ha-card');
 
     const btnHtml = this._speedNames.map((lbl, i) => {
       const bars = BAR_H[i].map(h => '<div class="bar" style="height:' + h + 'px"></div>').join('');
