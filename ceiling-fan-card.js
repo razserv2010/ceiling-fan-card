@@ -254,6 +254,12 @@ const BLADE_OPS   = [[0.24,0.19],[0.28,0.22],[0.32,0.26],[0.38,0.30],[0.44,0.36]
 const SPEED_PCT   = [17, 33, 50, 67, 83, 100];
 const BAR_H       = [[4],[4,7],[4,7,9],[4,7,9,11],[4,7,9,11,13],[4,7,9,11,13,15]];
 
+function defaultTapAction(domain) {
+  const moreInfoDomains = ['select', 'input_select', 'number', 'input_number',
+    'text', 'input_text', 'datetime', 'input_datetime', 'sensor', 'binary_sensor'];
+  return moreInfoDomains.includes(domain) ? { action: 'more-info' } : { action: 'toggle' };
+}
+
 class CeilingFanCard extends HTMLElement {
   constructor() {
     super();
@@ -601,20 +607,14 @@ class CeilingFanCard extends HTMLElement {
   _tapEntity(cfg) {
     if (!this._hass) return;
     const domain = cfg.entity.split('.')[0];
-    const tapAction = cfg.tap_action || this._defaultTapAction(domain);
+    const tapAction = cfg.tap_action || defaultTapAction(domain);
     this.dispatchEvent(new CustomEvent('hass-action', {
       bubbles: true, composed: true,
       detail: { config: { entity: cfg.entity, tap_action: tapAction }, action: 'tap' },
     }));
   }
 
-  _defaultTapAction(domain) {
-    // Domains that don't support toggle — use more-info instead
-    const moreInfoDomains = ['select', 'input_select', 'number', 'input_number',
-      'text', 'input_text', 'datetime', 'input_datetime', 'sensor', 'binary_sensor'];
-    if (moreInfoDomains.includes(domain)) return { action: 'more-info' };
-    return { action: 'toggle' };
-  }
+
 
   _updateUI(isOn, lvl) {
     const r = this.shadowRoot;
@@ -961,7 +961,7 @@ class CeilingFanCardEditor extends HTMLElement {
     actionForm.hass   = this._hass;
     actionForm.schema = [{ name: 'tap_action', selector: { action: {} } }];
     const domain = cfg.entity ? cfg.entity.split('.')[0] : '';
-    actionForm.data   = { tap_action: cfg.tap_action || this._defaultTapAction(domain) };
+    actionForm.data   = { tap_action: cfg.tap_action || defaultTapAction(domain) };
     actionForm.computeLabel = () => 'התנהגות בהקשה';
     actionForm.addEventListener('value-changed', e => {
       console.log('action value-changed:', JSON.stringify(e.detail.value));
