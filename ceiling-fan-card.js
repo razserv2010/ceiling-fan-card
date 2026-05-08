@@ -600,17 +600,20 @@ class CeilingFanCard extends HTMLElement {
 
   _tapEntity(cfg) {
     if (!this._hass) return;
-    const tapAction = cfg.tap_action;
-    if (tapAction) {
-      this.dispatchEvent(new CustomEvent('hass-action', {
-        bubbles: true, composed: true,
-        detail: { config: { entity: cfg.entity, tap_action: tapAction }, action: 'tap' },
-      }));
-    } else {
-      // Default: toggle
-      const domain = cfg.entity.split('.')[0];
-      this._hass.callService(domain, 'toggle', { entity_id: cfg.entity });
-    }
+    const domain = cfg.entity.split('.')[0];
+    const tapAction = cfg.tap_action || this._defaultTapAction(domain);
+    this.dispatchEvent(new CustomEvent('hass-action', {
+      bubbles: true, composed: true,
+      detail: { config: { entity: cfg.entity, tap_action: tapAction }, action: 'tap' },
+    }));
+  }
+
+  _defaultTapAction(domain) {
+    // Domains that don't support toggle — use more-info instead
+    const moreInfoDomains = ['select', 'input_select', 'number', 'input_number',
+      'text', 'input_text', 'datetime', 'input_datetime', 'sensor', 'binary_sensor'];
+    if (moreInfoDomains.includes(domain)) return { action: 'more-info' };
+    return { action: 'toggle' };
   }
 
   _updateUI(isOn, lvl) {
@@ -957,11 +960,16 @@ class CeilingFanCardEditor extends HTMLElement {
     const actionForm = document.createElement('ha-form');
     actionForm.hass   = this._hass;
     actionForm.schema = [{ name: 'tap_action', selector: { action: {} } }];
-    actionForm.data   = { tap_action: cfg.tap_action || { action: 'toggle' } };
+    const domain = cfg.entity ? cfg.entity.split('.')[0] : '';
+    actionForm.data   = { tap_action: cfg.tap_action || this._defaultTapAction(domain) };
     actionForm.computeLabel = () => 'התנהגות בהקשה';
     actionForm.addEventListener('value-changed', e => {
+      console.log('action value-changed:', JSON.stringify(e.detail.value));
+      const val = e.detail.value;
+      // ha-form returns { tap_action: {...} } OR just the action object directly
+      const tapAction = val?.tap_action !== undefined ? val.tap_action : val;
       const updated = [...(this._config.entities || [])];
-      updated[i] = { ...updated[i], tap_action: e.detail.value.tap_action };
+      updated[i] = { ...updated[i], tap_action: tapAction };
       this._config = { ...this._config, entities: updated };
       this._fire();
     });
