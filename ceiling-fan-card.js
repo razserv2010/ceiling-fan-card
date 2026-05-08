@@ -57,8 +57,8 @@ const CARD_STYLES = `
   .icon-btn {
     width: 34px; height: 34px;
     border-radius: 50%;
-    border: 1.5px solid var(--fan-divider);
-    background: var(--fan-bg2);
+    border: 1.5px solid rgba(128,128,128,0.3);
+    background: rgba(128,128,128,0.08);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: all .3s;
@@ -124,8 +124,8 @@ const CARD_STYLES = `
 
   .spd-btn {
     border-radius: 8px;
-    border: 1px solid var(--fan-divider);
-    background: var(--fan-bg2);
+    border: 1px solid rgba(128,128,128,0.25);
+    background: rgba(128,128,128,0.08);
     cursor: pointer; padding: 6px 2px 5px;
     display: flex; flex-direction: column; align-items: center; gap: 3px;
     transition: all .2s;
@@ -137,15 +137,15 @@ const CARD_STYLES = `
   }
 
   .btn-lbl {
-    font-size: 9px; font-weight: 700;
+    font-size: 11px; font-weight: 700;
     color: var(--fan-subtext);
     line-height: 1.15; text-align: center; direction: rtl;
     transition: color .2s;
   }
   .spd-btn.active .btn-lbl { color: var(--fan-accent); }
 
-  .bars { display: flex; gap: 1.5px; align-items: flex-end; height: 8px; }
-  .bar { width: 3px; border-radius: 2px; background: var(--fan-divider); transition: background .2s; }
+  .bars { display: flex; gap: 1.5px; align-items: flex-end; height: 10px; }
+  .bar { width: 3px; border-radius: 2px; background: rgba(128,128,128,0.4); transition: background .2s; }
   .spd-btn.active .bar { background: var(--fan-accent); }
 `;
 
