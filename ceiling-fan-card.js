@@ -17,21 +17,25 @@
 
 const CARD_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800&display=swap');
-
-  :host { display: block; }
+  :host { display: block; font-family: 'Heebo', sans-serif; }
 
   ha-card {
     padding: 16px 16px 14px;
     position: relative;
     overflow: hidden;
+    --fan-accent: var(--accent-color, #6366f1);
+    --fan-text: var(--primary-text-color, #212121);
+    --fan-subtext: var(--secondary-text-color, #727272);
+    --fan-divider: var(--divider-color, rgba(0,0,0,0.12));
+    --fan-bg2: var(--secondary-background-color, rgba(0,0,0,0.04));
+    --fan-disabled: var(--disabled-text-color, #bdbdbd);
   }
 
-  /* accent bar */
   ha-card::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, var(--accent-color, #6366f1), #0ea5e9, #06b6d4);
+    background: linear-gradient(90deg, var(--fan-accent), #0ea5e9, #06b6d4);
   }
 
   .header {
@@ -44,80 +48,72 @@ const CARD_STYLES = `
   .title {
     font-size: 15px;
     font-weight: 800;
-    color: var(--primary-text-color);
+    color: var(--fan-text);
     line-height: 1;
   }
 
-  .btns {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+  .btns { display: flex; align-items: center; gap: 8px; }
 
   .icon-btn {
     width: 34px; height: 34px;
     border-radius: 50%;
-    border: 1.5px solid var(--divider-color);
-    background: var(--secondary-background-color);
+    border: 1.5px solid var(--fan-divider);
+    background: var(--fan-bg2);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: all .3s;
     padding: 0;
   }
 
-  .power-btn.on {
-    border-color: var(--accent-color, #6366f1);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--accent-color, #6366f1) 35%, transparent);
-  }
-
   .power-btn svg {
     width: 14px; height: 14px;
-    stroke: var(--secondary-text-color);
+    stroke: var(--fan-subtext);
     fill: none; stroke-width: 2; stroke-linecap: round;
     transition: stroke .3s;
   }
-  .power-btn.on svg { stroke: var(--accent-color, #6366f1); }
+  .power-btn.on {
+    border-color: var(--fan-accent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--fan-accent) 35%, transparent);
+  }
+  .power-btn.on svg { stroke: var(--fan-accent); }
 
   .extra-btn {
     border-color: rgba(245,158,11,0.5);
     background: rgba(245,158,11,0.1);
   }
+  .extra-btn svg {
+    width: 15px; height: 15px;
+    fill: none; stroke: rgb(245,158,11);
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
 
   .fan-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-    position: relative;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 8px;
+    margin-bottom: 12px; position: relative;
   }
 
   .fan-glow {
-    position: absolute;
-    top: 50%; left: 50%;
+    position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -54%);
-    width: 120px; height: 120px;
-    border-radius: 50%;
+    width: 120px; height: 120px; border-radius: 50%;
     background: radial-gradient(circle,
-      color-mix(in srgb, var(--accent-color, #6366f1) 18%, transparent),
+      color-mix(in srgb, var(--fan-accent) 18%, transparent),
       transparent 65%);
-    opacity: 0;
-    transition: opacity .5s;
-    pointer-events: none;
+    opacity: 0; transition: opacity .5s; pointer-events: none;
   }
   .fan-glow.active { opacity: 1; }
 
   .fan-svg { width: 110px; height: 110px; }
 
   .speed-name {
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--accent-color, #6366f1);
+    font-size: 18px; font-weight: 800;
+    color: var(--fan-accent);
     transition: color .3s;
   }
   .speed-name.off {
-    color: var(--disabled-text-color, var(--secondary-text-color));
-    opacity: 0.4;
+    color: var(--fan-disabled);
+    opacity: 0.6;
   }
 
   .controls {
@@ -128,43 +124,29 @@ const CARD_STYLES = `
 
   .spd-btn {
     border-radius: 8px;
-    border: 1px solid var(--divider-color);
-    background: var(--secondary-background-color);
-    cursor: pointer;
-    padding: 6px 2px 5px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
+    border: 1px solid var(--fan-divider);
+    background: var(--fan-bg2);
+    cursor: pointer; padding: 6px 2px 5px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
     transition: all .2s;
   }
-  .spd-btn:hover {
-    border-color: var(--accent-color, #6366f1);
-    transform: translateY(-1px);
-  }
+  .spd-btn:hover { border-color: var(--fan-accent); transform: translateY(-1px); }
   .spd-btn.active {
-    border-color: var(--accent-color, #6366f1);
-    background: color-mix(in srgb, var(--accent-color, #6366f1) 10%, var(--secondary-background-color));
+    border-color: var(--fan-accent);
+    background: color-mix(in srgb, var(--fan-accent) 12%, var(--fan-bg2));
   }
 
   .btn-lbl {
-    font-size: 9px;
-    font-weight: 700;
-    color: var(--secondary-text-color);
-    line-height: 1.15;
-    text-align: center;
-    direction: rtl;
+    font-size: 9px; font-weight: 700;
+    color: var(--fan-subtext);
+    line-height: 1.15; text-align: center; direction: rtl;
     transition: color .2s;
   }
-  .spd-btn.active .btn-lbl { color: var(--accent-color, #6366f1); }
+  .spd-btn.active .btn-lbl { color: var(--fan-accent); }
 
   .bars { display: flex; gap: 1.5px; align-items: flex-end; height: 8px; }
-  .bar {
-    width: 3px; border-radius: 2px;
-    background: var(--divider-color);
-    transition: background .2s;
-  }
-  .spd-btn.active .bar { background: var(--accent-color, #6366f1); }
+  .bar { width: 3px; border-radius: 2px; background: var(--fan-divider); transition: background .2s; }
+  .spd-btn.active .bar { background: var(--fan-accent); }
 `;
 
 const DEFAULT_SPEED_NAMES = ['חלש מאוד', 'חלש', 'בינוני-חלש', 'בינוני', 'חזק', 'חזק מאוד'];
@@ -176,6 +158,7 @@ const BAR_H       = [[4],[4,7],[4,7,9],[4,7,9,11],[4,7,9,11,13],[4,7,9,11,13,15]
 class CeilingFanCard extends HTMLElement {
   constructor() {
     super();
+    this.attachShadow({ mode: 'open' });
     this._built = false;
     this._angle = 0;
     this._currentDur = TARGET_DURS[2];
@@ -196,24 +179,37 @@ class CeilingFanCard extends HTMLElement {
     this._config     = config;
     this._entity     = config.entity;
     this._name       = config.name || null;
-    this._speedNames = Array.isArray(config.speed_names)
-      ? config.speed_names
-      : DEFAULT_SPEED_NAMES;
+    this._speedNames = Array.isArray(config.speed_names) ? config.speed_names : DEFAULT_SPEED_NAMES;
     if (this._built) { this._built = false; this._build(); this._built = true; }
   }
 
   get _extra() { return this._config?.extra_entity || null; }
 
-  getCardSize() { return this._extra ? 5 : 4; }
-
-  static getStubConfig() { return { entity: 'fan.my_ceiling_fan' }; }
+  getCardSize() { return 4; }
   static getConfigElement() { return document.createElement('ceiling-fan-card-editor'); }
+  static getStubConfig() { return { entity: 'fan.my_ceiling_fan' }; }
+
+  _isDark() {
+    // Detect light/dark mode from HA theme
+    const bg = getComputedStyle(document.documentElement)
+      .getPropertyValue('--card-background-color').trim();
+    if (!bg) return true;
+    // Parse luminance — dark if background is dark
+    const m = bg.match(/\d+/g);
+    if (m && m.length >= 3) {
+      const lum = 0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2];
+      return lum < 128;
+    }
+    return true;
+  }
 
   _build() {
-    const r = this;
-    this.innerHTML = '';
+    const r = this.shadowRoot;
+    r.innerHTML = '';
 
-
+    const style = document.createElement('style');
+    style.textContent = CARD_STYLES;
+    r.appendChild(style);
 
     const card = document.createElement('ha-card');
 
@@ -224,7 +220,7 @@ class CeilingFanCard extends HTMLElement {
 
     card.innerHTML =
       '<div class="header">' +
-        '<div><div class="title" id="name">מאוורר תקרה</div></div>' +
+        '<div class="title" id="name">מאוורר תקרה</div>' +
         '<div class="btns" id="btns">' +
           '<button class="icon-btn power-btn" id="power">' +
             '<svg viewBox="0 0 24 24"><path d="M12 2v6M6.3 6.3A8 8 0 1 0 17.7 6.3"/></svg>' +
@@ -234,27 +230,22 @@ class CeilingFanCard extends HTMLElement {
       '<div class="fan-center">' +
         '<div class="fan-glow" id="glow"></div>' +
         '<svg class="fan-svg" viewBox="0 0 104 104">' +
-          '<rect x="50" y="0" width="4" height="14" rx="2" fill="rgba(255,255,255,0.1)"/>' +
-          '<ellipse cx="52" cy="18" rx="10" ry="5" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.09)" stroke-width="0.8"/>' +
+          '<rect x="50" y="0" width="4" height="14" rx="2" fill="var(--fan-divider)"/>' +
+          '<ellipse cx="52" cy="18" rx="10" ry="5" fill="var(--fan-bg2)" stroke="var(--fan-divider)" stroke-width="0.8"/>' +
           '<defs><ellipse id="blade-tmpl" cx="52" cy="30" rx="7" ry="22"/></defs>' +
           '<g id="blades">' +
             '<use href="#blade-tmpl" id="b1" fill="rgba(99,102,241,0.24)" stroke="rgba(99,102,241,0.32)" stroke-width="0.5"/>' +
             '<use href="#blade-tmpl" id="b2" transform="rotate(120 52 52)" fill="rgba(99,102,241,0.19)" stroke="rgba(99,102,241,0.26)" stroke-width="0.5"/>' +
             '<use href="#blade-tmpl" id="b3" transform="rotate(240 52 52)" fill="rgba(99,102,241,0.24)" stroke="rgba(99,102,241,0.32)" stroke-width="0.5"/>' +
           '</g>' +
-          '<circle cx="52" cy="52" r="10" fill="var(--card-background-color, #fff)" stroke="rgba(99,102,241,0.28)" stroke-width="1"/>' +
-          '<circle cx="52" cy="52" r="6" fill="url(#hg)" stroke="rgba(99,102,241,0.18)" stroke-width="0.8"/>' +
-          '<circle cx="52" cy="52" r="2.8" fill="var(--accent-color, #818cf8)" opacity="0.9"/>' +
-          '<defs><radialGradient id="hg" cx="35%" cy="35%">' +
-            '<stop offset="0%" stop-color="rgba(155,160,225,0.9)"/>' +
-            '<stop offset="100%" stop-color="rgba(75,80,145,0.85)"/>' +
-          '</radialGradient></defs>' +
+          '<circle cx="52" cy="52" r="10" fill="var(--card-background-color, #fff)" stroke="rgba(99,102,241,0.3)" stroke-width="1"/>' +
+          '<circle cx="52" cy="52" r="5" fill="var(--fan-accent)"/>' +
         '</svg>' +
         '<div class="speed-name off" id="spname">כבוי</div>' +
       '</div>' +
       '<div class="controls">' + btnHtml + '</div>';
 
-    this.appendChild(card);
+    r.appendChild(card);
 
     r.getElementById('power').addEventListener('click', () => this._togglePower());
     r.querySelectorAll('.spd-btn').forEach(b =>
@@ -265,28 +256,27 @@ class CeilingFanCard extends HTMLElement {
   }
 
   _buildExtraBtn() {
-    const r = this;
+    const r = this.shadowRoot;
     const btns = r.getElementById('btns');
-    if (!btns || !this._extra) return;
-    if (r.getElementById('extra-btn')) return; // already exists
+    if (!btns || !this._extra || r.getElementById('extra-btn')) return;
 
     const extraBtn = document.createElement('button');
-    extraBtn.className = 'extra-btn';
+    extraBtn.className = 'icon-btn extra-btn';
     extraBtn.id = 'extra-btn';
 
     if (this._extra.icon) {
       const haIcon = document.createElement('ha-icon');
       haIcon.setAttribute('icon', this._extra.icon);
-      const iconColor = this._extra.icon_color
+      const color = this._extra.icon_color
         ? 'var(--' + this._extra.icon_color + '-color, ' + this._extra.icon_color + ')'
-        : '#fbbf24';
+        : 'rgb(245,158,11)';
       haIcon.style.setProperty('--mdc-icon-size', '18px');
-      haIcon.style.color = iconColor;
+      haIcon.style.color = color;
       extraBtn.appendChild(haIcon);
     } else {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('viewBox', '0 0 24 24');
-      svg.style.cssText = 'width:15px;height:15px;fill:none;stroke:#fbbf24;stroke-width:2;stroke-linecap:round;stroke-linejoin:round';
+      svg.style.cssText = 'width:15px;height:15px;fill:none;stroke:rgb(245,158,11);stroke-width:2;stroke-linecap:round;stroke-linejoin:round';
       svg.innerHTML = '<path d="M12 6a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/><path d="M12 10v4l2.5 2.5"/><path d="M9 2h6M12 2v4"/><path d="M18.4 5.6l1.4-1.4"/>';
       extraBtn.appendChild(svg);
     }
@@ -306,7 +296,7 @@ class CeilingFanCard extends HTMLElement {
           Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1)
       : 0;
 
-    const nameEl = this.querySelector('name');
+    const nameEl = this.shadowRoot.getElementById('name');
     if (nameEl) nameEl.textContent = this._name || obj.attributes.friendly_name || 'מאוורר תקרה';
 
     if (isOn && lvl > 0) this._startSpin(lvl);
@@ -314,11 +304,30 @@ class CeilingFanCard extends HTMLElement {
     this._isOn = isOn;
 
     this._updateUI(isOn, lvl);
-    this._buildExtraBtn(); // ensure btn exists
+    this._buildExtraBtn();
+
+    // Apply light mode adjustments if needed
+    this._applyTheme();
+  }
+
+  _applyTheme() {
+    const card = this.shadowRoot.querySelector('ha-card');
+    if (!card) return;
+    const dark = this._isDark();
+    // In light mode make divider and bg2 more visible
+    if (!dark) {
+      card.style.setProperty('--fan-divider', 'rgba(0,0,0,0.15)');
+      card.style.setProperty('--fan-bg2', 'rgba(0,0,0,0.05)');
+      card.style.setProperty('--fan-disabled', '#9e9e9e');
+    } else {
+      card.style.removeProperty('--fan-divider');
+      card.style.removeProperty('--fan-bg2');
+      card.style.removeProperty('--fan-disabled');
+    }
   }
 
   _updateUI(isOn, lvl) {
-    const r = this;
+    const r = this.shadowRoot;
     r.getElementById('power')?.classList.toggle('on', isOn);
     r.getElementById('glow')?.classList.toggle('active', isOn && lvl > 0);
 
@@ -336,21 +345,19 @@ class CeilingFanCard extends HTMLElement {
   }
 
   _getAccentColor() {
-    // Read accent color from HA theme CSS variable
-    return getComputedStyle(this).getPropertyValue('--accent-color').trim() || '#6366f1';
+    return getComputedStyle(this.shadowRoot.querySelector('ha-card') || document.documentElement)
+      .getPropertyValue('--accent-color').trim() || '#6366f1';
   }
 
   _setBladeColors(idx) {
     const [o1, o2] = BLADE_OPS[idx];
-    const r = this;
+    const r = this.shadowRoot;
     const accent = this._getAccentColor();
     const f1 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o1 * 100) + '%, transparent)';
     const f2 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o2 * 100) + '%, transparent)';
-    const s1 = 'color-mix(in srgb, ' + accent + ' ' + Math.round((o1+0.1) * 100) + '%, transparent)';
-    const s2 = 'color-mix(in srgb, ' + accent + ' ' + Math.round((o2+0.08) * 100) + '%, transparent)';
-    [['b1',f1,s1],['b2',f2,s2],['b3',f1,s1]].forEach(([id,f,s]) => {
+    [['b1',f1],['b2',f2],['b3',f1]].forEach(([id,f]) => {
       const el = r.getElementById(id);
-      if (el) { el.setAttribute('fill', f); el.setAttribute('stroke', s); }
+      if (el) { el.setAttribute('fill', f); el.setAttribute('stroke', f); }
     });
   }
 
@@ -375,14 +382,14 @@ class CeilingFanCard extends HTMLElement {
       if (this._currentDur >= 20) {
         this._decelerating = false;
         this._rafId = null;
-        const spname = this.querySelector('spname');
+        const spname = this.shadowRoot.getElementById('spname');
         if (spname) { spname.textContent = 'כבוי'; spname.classList.add('off'); }
         return;
       }
     }
 
     this._angle = (this._angle + 360 / this._currentDur * dt) % 360;
-    this.querySelector('blades')?.setAttribute('transform', 'rotate(' + this._angle + ' 52 52)');
+    this.shadowRoot.getElementById('blades')?.setAttribute('transform', 'rotate(' + this._angle + ' 52 52)');
     this._rafId = requestAnimationFrame(ts => this._loop(ts));
   }
 
@@ -425,18 +432,15 @@ const EDITOR_STYLES = `
 class CeilingFanCardEditor extends HTMLElement {
   constructor() {
     super();
+    this.attachShadow({ mode: 'open' });
     this._config = {};
   }
 
-  setConfig(config) {
-    this._config = { ...config };
-    this._render();
-  }
+  setConfig(config) { this._config = { ...config }; this._render(); }
 
   set hass(hass) {
     this._hass = hass;
-    // Forward hass to all sub-elements
-    this.querySelectorAll('ha-entity-picker, ha-icon-picker, ha-form, hui-action-editor')
+    this.shadowRoot.querySelectorAll('ha-entity-picker, ha-icon-picker, ha-form, hui-action-editor')
       .forEach(el => { el.hass = hass; });
   }
 
@@ -447,9 +451,8 @@ class CeilingFanCardEditor extends HTMLElement {
   }
 
   _render() {
-    const r = this;
-    this.innerHTML = '';
-
+    const r = this.shadowRoot;
+    r.innerHTML = '';
     const style = document.createElement('style');
     style.textContent = EDITOR_STYLES;
     r.appendChild(style);
@@ -457,17 +460,14 @@ class CeilingFanCardEditor extends HTMLElement {
     const root = document.createElement('div');
     root.className = 'root';
 
-    // ── Main entity & name via ha-form ──
+    // Main form
     const mainForm = document.createElement('ha-form');
-    mainForm.hass   = this._hass;
+    mainForm.hass = this._hass;
     mainForm.schema = [
       { name: 'entity', required: true, selector: { entity: { domain: 'fan' } } },
-      { name: 'name',   selector: { text: {} } },
+      { name: 'name', selector: { text: {} } },
     ];
-    mainForm.data = {
-      entity: this._config.entity || '',
-      name:   this._config.name   || '',
-    };
+    mainForm.data = { entity: this._config.entity || '', name: this._config.name || '' };
     mainForm.computeLabel = s => ({ entity: 'ישות מאוורר', name: 'שם מותאם' })[s.name] || s.name;
     mainForm.addEventListener('value-changed', e => {
       this._config = { ...this._config, ...e.detail.value };
@@ -475,21 +475,16 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(mainForm);
 
-    // ── Speed names via ha-form ──
+    // Speed names
     const speedTitle = document.createElement('div');
     speedTitle.className = 'section-title';
     speedTitle.textContent = 'שמות מהירויות';
     root.appendChild(speedTitle);
 
-    const names = Array.isArray(this._config.speed_names)
-      ? this._config.speed_names
-      : DEFAULT_SPEED_NAMES;
-
+    const names = Array.isArray(this._config.speed_names) ? this._config.speed_names : DEFAULT_SPEED_NAMES;
     const speedForm = document.createElement('ha-form');
-    speedForm.hass   = this._hass;
-    speedForm.schema = names.map((_, i) => ({
-      name: 'speed_' + (i+1), selector: { text: {} },
-    }));
+    speedForm.hass = this._hass;
+    speedForm.schema = names.map((_, i) => ({ name: 'speed_' + (i+1), selector: { text: {} } }));
     speedForm.data = Object.fromEntries(names.map((n, i) => ['speed_' + (i+1), n]));
     speedForm.computeLabel = s => 'מהירות ' + s.name.replace('speed_', '');
     speedForm.addEventListener('value-changed', e => {
@@ -499,18 +494,16 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(speedForm);
 
-    // ── Extra entity ──
+    // Extra entity
     const extraTitle = document.createElement('div');
     extraTitle.className = 'section-title';
     extraTitle.textContent = 'ישות נוספת';
     root.appendChild(extraTitle);
 
     const extra = this._config.extra_entity || null;
-
-    // Toggle switch for extra entity
     const extraToggle = document.createElement('ha-formfield');
-    extraToggle.innerHTML = '<ha-switch id="extra-sw"' + (extra ? ' checked' : '') + '></ha-switch><span style="margin-right:8px;font-size:14px;color:var(--primary-text-color)">הוסף ישות לכרטיס</span>';
     extraToggle.style.cssText = 'display:flex;align-items:center;flex-direction:row-reverse;justify-content:flex-end;gap:8px;margin-bottom:8px';
+    extraToggle.innerHTML = '<ha-switch id="extra-sw"' + (extra ? ' checked' : '') + '></ha-switch><span style="margin-right:8px;font-size:14px;color:var(--primary-text-color)">הוסף ישות לכרטיס</span>';
     extraToggle.querySelector('ha-switch').addEventListener('change', e => {
       if (e.target.checked) {
         this._config = { ...this._config, extra_entity: { entity: '' } };
@@ -527,37 +520,27 @@ class CeilingFanCardEditor extends HTMLElement {
       const extraBlock = document.createElement('div');
       extraBlock.className = 'extra-block';
 
-      // Entity + name + icon + color via ha-form
       const extraForm = document.createElement('ha-form');
-      extraForm.hass   = this._hass;
+      extraForm.hass = this._hass;
       extraForm.schema = [
-        { name: 'entity',     required: true, selector: { entity: {} } },
-        { name: 'name',       selector: { text: {} } },
-        { name: 'icon',       selector: { icon: {} } },
+        { name: 'entity', required: true, selector: { entity: {} } },
+        { name: 'name', selector: { text: {} } },
+        { name: 'icon', selector: { icon: {} } },
         { name: 'icon_color', selector: { ui_color: {} } },
       ];
       extraForm.data = {
-        entity:     extra.entity     || '',
-        name:       extra.name       || '',
-        icon:       extra.icon       || '',
+        entity: extra.entity || '',
+        name: extra.name || '',
+        icon: extra.icon || '',
         icon_color: extra.icon_color || '',
       };
-      extraForm.computeLabel = s => ({
-        entity:     'ישות',
-        name:       'שם תווית',
-        icon:       'אייקון',
-        icon_color: 'צבע אייקון',
-      })[s.name] || s.name;
+      extraForm.computeLabel = s => ({ entity: 'ישות', name: 'שם תווית', icon: 'אייקון', icon_color: 'צבע אייקון' })[s.name] || s.name;
       extraForm.addEventListener('value-changed', e => {
-        this._config = {
-          ...this._config,
-          extra_entity: { ...this._config.extra_entity, ...e.detail.value },
-        };
+        this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, ...e.detail.value } };
         this._fire();
       });
       extraBlock.appendChild(extraForm);
 
-      // tap_action via hui-action-editor (native HA Interactions UI)
       const actionTitle = document.createElement('div');
       actionTitle.className = 'section-title';
       actionTitle.textContent = 'אינטראקציה';
@@ -565,18 +548,12 @@ class CeilingFanCardEditor extends HTMLElement {
       extraBlock.appendChild(actionTitle);
 
       const actionEditor = document.createElement('hui-action-editor');
-      actionEditor.hass   = this._hass;
-      actionEditor.label  = 'התנהגות בהקשה';
+      actionEditor.hass = this._hass;
+      actionEditor.label = 'התנהגות בהקשה';
       actionEditor.config = extra.tap_action || { action: 'more-info' };
-      actionEditor.actions = [
-        'more-info', 'toggle', 'navigate', 'url',
-        'perform-action', 'assist', 'none',
-      ];
+      actionEditor.actions = ['more-info', 'toggle', 'navigate', 'url', 'perform-action', 'assist', 'none'];
       actionEditor.addEventListener('value-changed', e => {
-        this._config = {
-          ...this._config,
-          extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value },
-        };
+        this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value } };
         this._fire();
       });
       extraBlock.appendChild(actionEditor);
@@ -586,20 +563,10 @@ class CeilingFanCardEditor extends HTMLElement {
 
     r.appendChild(root);
 
-    // Forward hass to all elements
     if (this._hass) {
-      r.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker, hui-action-editor')
-        .forEach(el => { el.hass = this._hass; });
+      r.querySelectorAll('ha-form, hui-action-editor').forEach(el => { el.hass = this._hass; });
     }
   }
-}
-
-// Inject card styles into document head once
-if (!document.getElementById('ceiling-fan-card-styles')) {
-  const s = document.createElement('style');
-  s.id = 'ceiling-fan-card-styles';
-  s.textContent = CARD_STYLES;
-  document.head.appendChild(s);
 }
 
 customElements.define('ceiling-fan-card', CeilingFanCard);
