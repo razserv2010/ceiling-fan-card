@@ -203,6 +203,49 @@ const CARD_STYLES = `
   .preset-item.active .preset-item-name { color: var(--fan-accent); }
   .preset-check { width: 14px; height: 14px; stroke: var(--fan-accent); fill: none; stroke-width: 2.5; stroke-linecap: round; opacity: 0; }
   .preset-item.active .preset-check { opacity: 1; }
+
+  /* ── Entities list ── */
+  .entities-section { border-top: 1px solid var(--fan-divider); padding-top: 8px; margin-top: 4px; }
+
+  .entity-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 4px; border-radius: 8px; cursor: pointer;
+    transition: background .15s;
+    border-bottom: 1px solid var(--fan-divider);
+  }
+  .entity-row:last-child { border: none; }
+  .entity-row:hover { background: color-mix(in srgb, var(--fan-accent) 5%, transparent); }
+
+  .entity-icon-wrap {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--fan-bg2); border: 1px solid var(--fan-divider);
+    transition: all .3s;
+  }
+  .entity-icon-wrap.on { background: color-mix(in srgb, var(--fan-accent) 15%, transparent); border-color: color-mix(in srgb, var(--fan-accent) 35%, transparent); }
+  .entity-icon-wrap ha-icon { --mdc-icon-size: 18px; color: var(--fan-subtext); transition: color .3s; }
+  .entity-icon-wrap.on ha-icon { color: var(--fan-accent); }
+
+  .entity-info { flex: 1; min-width: 0; }
+  .entity-name { font-size: 13px; font-weight: 600; color: var(--fan-text); line-height: 1.2; }
+  .entity-state { font-size: 11px; color: var(--fan-subtext); margin-top: 1px; }
+  .entity-state.on { color: var(--fan-accent); }
+
+  .entity-toggle {
+    width: 36px; height: 20px; border-radius: 10px;
+    border: none; cursor: pointer; position: relative;
+    transition: background .3s; flex-shrink: 0; padding: 0;
+    background: var(--fan-divider);
+  }
+  .entity-toggle.on { background: var(--fan-accent); }
+  .entity-toggle-thumb {
+    width: 14px; height: 14px; border-radius: 50%; background: white;
+    position: absolute; top: 3px; transition: left .3s;
+    left: 3px;
+  }
+  .entity-toggle.on .entity-toggle-thumb { left: 19px; }
+
+  .entity-chevron { width: 16px; height: 16px; flex-shrink: 0; stroke: var(--fan-subtext); fill: none; stroke-width: 2; stroke-linecap: round; }
 `;
 
 const DEFAULT_SPEED_NAMES = ['חלש מאוד', 'חלש', 'בינוני-חלש', 'בינוני', 'חזק', 'חזק מאוד'];
@@ -309,7 +352,8 @@ class CeilingFanCard extends HTMLElement {
           '<svg class="preset-arrow" id="preset-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>' +
         '</div>' +
         '<div class="preset-list" id="preset-list"></div>' +
-      '</div>';
+      '</div>' +
+      '<div class="entities-section" id="entities-section" style="display:none"></div>';
 
     r.appendChild(card);
 
@@ -394,6 +438,7 @@ class CeilingFanCard extends HTMLElement {
     this._updateUI(isOn, lvl);
     this._buildExtraBtn();
     this._syncPresets(obj);
+    this._syncEntities();
 
     // Apply light mode adjustments if needed
   }
@@ -465,6 +510,107 @@ class CeilingFanCard extends HTMLElement {
     // Update selected label
     const activePreset = presets.includes(currentPreset) ? currentPreset : presets[0];
     selected.textContent = activePreset;
+  }
+
+  _syncEntities() {
+    const r = this.shadowRoot;
+    const section = r.getElementById('entities-section');
+    if (!section) return;
+
+    const entities = this._config.entities;
+    if (!entities || entities.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+
+    entities.forEach((cfg, i) => {
+      const id = 'entity-row-' + i;
+      let row = r.getElementById(id);
+      const obj = this._hass?.states[cfg.entity];
+      const isOn = obj?.state === 'on' || obj?.state === 'true';
+      const domain = cfg.entity.split('.')[0];
+      const isToggleable = ['switch','light','input_boolean','fan','automation'].includes(domain);
+      const name = cfg.name || obj?.attributes?.friendly_name || cfg.entity;
+      const icon = cfg.icon || obj?.attributes?.icon || this._defaultIcon(domain);
+      const stateLabel = isOn ? 'פועל' : (obj ? 'כבוי' : 'לא זמין');
+
+      if (!row) {
+        // Build row
+        row = document.createElement('div');
+        row.className = 'entity-row';
+        row.id = id;
+
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'entity-icon-wrap' + (isOn ? ' on' : '');
+        iconWrap.id = id + '-icon';
+        const haIcon = document.createElement('ha-icon');
+        haIcon.setAttribute('icon', icon);
+        iconWrap.appendChild(haIcon);
+
+        const info = document.createElement('div');
+        info.className = 'entity-info';
+        info.innerHTML = '<div class="entity-name">' + name + '</div><div class="entity-state' + (isOn?' on':'') + '" id="' + id + '-state">' + stateLabel + '</div>';
+
+        row.appendChild(iconWrap);
+        row.appendChild(info);
+
+        if (isToggleable) {
+          const toggle = document.createElement('button');
+          toggle.className = 'entity-toggle' + (isOn ? ' on' : '');
+          toggle.id = id + '-toggle';
+          toggle.innerHTML = '<div class="entity-toggle-thumb"></div>';
+          toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._tapEntity(cfg);
+          });
+          row.appendChild(toggle);
+        } else {
+          const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          chevron.setAttribute('viewBox', '0 0 24 24');
+          chevron.setAttribute('class', 'entity-chevron');
+          chevron.innerHTML = '<polyline points="9 18 15 12 9 6"/>';
+          row.appendChild(chevron);
+        }
+
+        row.addEventListener('click', () => this._tapEntity(cfg));
+        section.appendChild(row);
+      } else {
+        // Update existing row
+        const iconWrap = r.getElementById(id + '-icon');
+        if (iconWrap) iconWrap.className = 'entity-icon-wrap' + (isOn ? ' on' : '');
+        const stateEl = r.getElementById(id + '-state');
+        if (stateEl) { stateEl.textContent = stateLabel; stateEl.className = 'entity-state' + (isOn ? ' on' : ''); }
+        const toggleEl = r.getElementById(id + '-toggle');
+        if (toggleEl) { toggleEl.className = 'entity-toggle' + (isOn ? ' on' : ''); }
+      }
+    });
+  }
+
+  _defaultIcon(domain) {
+    const icons = {
+      switch: 'mdi:toggle-switch', light: 'mdi:lightbulb',
+      input_boolean: 'mdi:checkbox-marked-circle', fan: 'mdi:fan',
+      automation: 'mdi:robot', script: 'mdi:script-text',
+      scene: 'mdi:palette', timer: 'mdi:timer',
+    };
+    return icons[domain] || 'mdi:power';
+  }
+
+  _tapEntity(cfg) {
+    if (!this._hass) return;
+    const tapAction = cfg.tap_action;
+    if (tapAction) {
+      this.dispatchEvent(new CustomEvent('hass-action', {
+        bubbles: true, composed: true,
+        detail: { config: { entity: cfg.entity, tap_action: tapAction }, action: 'tap' },
+      }));
+    } else {
+      // Default: toggle
+      const domain = cfg.entity.split('.')[0];
+      this._hass.callService(domain, 'toggle', { entity_id: cfg.entity });
+    }
   }
 
   _updateUI(isOn, lvl) {
