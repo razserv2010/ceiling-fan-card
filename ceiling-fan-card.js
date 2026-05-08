@@ -256,15 +256,19 @@ class CeilingFanCard extends HTMLElement {
     const [o1, o2] = BLADE_OPS[idx];
     const r = this.shadowRoot;
     const accent = this._getAccentColor();
-    // Use currentColor trick — set fill as color-mix via style attribute
     const f1 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o1 * 100) + '%, transparent)';
     const f2 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o2 * 100) + '%, transparent)';
+    const s1 = 'color-mix(in srgb, ' + accent + ' ' + Math.round((o1+0.1) * 100) + '%, transparent)';
+    const s2 = 'color-mix(in srgb, ' + accent + ' ' + Math.round((o2+0.08) * 100) + '%, transparent)';
     r.getElementById('b1')?.setAttribute('fill', f1);
-    r.getElementById('b1')?.setAttribute('stroke', f1);
+    r.getElementById('b1')?.setAttribute('stroke', s1);
+    r.getElementById('b1')?.setAttribute('stroke-width', '0.5');
     r.getElementById('b2')?.setAttribute('fill', f2);
-    r.getElementById('b2')?.setAttribute('stroke', f2);
+    r.getElementById('b2')?.setAttribute('stroke', s2);
+    r.getElementById('b2')?.setAttribute('stroke-width', '0.5');
     r.getElementById('b3')?.setAttribute('fill', f1);
-    r.getElementById('b3')?.setAttribute('stroke', f1);
+    r.getElementById('b3')?.setAttribute('stroke', s1);
+    r.getElementById('b3')?.setAttribute('stroke-width', '0.5');
   }
 
   _startSpin(lvl) {
