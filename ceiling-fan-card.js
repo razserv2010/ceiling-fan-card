@@ -60,6 +60,7 @@ const CARD_STYLES = `
   .fan-glow.active { opacity: 1; }
   .fan-svg { width: 120px; height: 120px; overflow: visible; }
   .fan-blade { transition: fill .4s, stroke .4s; }
+  .fan-blade-init { fill: color-mix(in srgb, var(--accent-color,#6366f1) 20%, transparent); stroke: color-mix(in srgb, var(--accent-color,#6366f1) 30%, transparent); }
   .speed-name { font-size: 20px; font-weight: 800; color: #818cf8; text-shadow: 0 0 14px rgba(99,102,241,0.35); transition: color .3s, text-shadow .3s; }
   .speed-name.off { color: rgba(255,255,255,0.12); text-shadow: none; }
   .controls { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-bottom: 14px; }
@@ -147,13 +148,13 @@ class CeilingFanCard extends HTMLElement {
           '<rect x="50" y="0" width="4" height="14" rx="2" fill="rgba(255,255,255,0.1)"/>' +
           '<ellipse cx="52" cy="18" rx="10" ry="5" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.09)" stroke-width="0.8"/>' +
           '<g id="blades">' +
-            '<ellipse class="fan-blade" id="b1" cx="52" cy="27" rx="7" ry="26" transform="rotate(0 52 52)" fill="rgba(99,102,241,0.24)" stroke="rgba(99,102,241,0.32)" stroke-width="0.5"/>' +
-            '<ellipse class="fan-blade" id="b2" cx="52" cy="27" rx="7" ry="26" transform="rotate(120 52 52)" fill="rgba(99,102,241,0.19)" stroke="rgba(99,102,241,0.26)" stroke-width="0.5"/>' +
-            '<ellipse class="fan-blade" id="b3" cx="52" cy="27" rx="7" ry="26" transform="rotate(240 52 52)" fill="rgba(99,102,241,0.24)" stroke="rgba(99,102,241,0.32)" stroke-width="0.5"/>' +
+            '<ellipse class="fan-blade" id="b1" cx="52" cy="27" rx="7" ry="26" transform="rotate(0 52 52)" class="fan-blade-init" stroke-width="0.5"/>' +
+            '<ellipse class="fan-blade" id="b2" cx="52" cy="27" rx="7" ry="26" transform="rotate(120 52 52)" class="fan-blade-init" stroke-width="0.5"/>' +
+            '<ellipse class="fan-blade" id="b3" cx="52" cy="27" rx="7" ry="26" transform="rotate(240 52 52)" class="fan-blade-init" stroke-width="0.5"/>' +
           '</g>' +
-          '<circle cx="52" cy="52" r="10" fill="#1a1d2e" stroke="rgba(99,102,241,0.28)" stroke-width="1"/>' +
+          '<circle cx="52" cy="52" r="10" fill="var(--card-background-color, #fff)" stroke="rgba(99,102,241,0.28)" stroke-width="1"/>' +
           '<circle cx="52" cy="52" r="6" fill="url(#hg)" stroke="rgba(99,102,241,0.18)" stroke-width="0.8"/>' +
-          '<circle cx="52" cy="52" r="2.8" fill="#818cf8" opacity="0.9"/>' +
+          '<circle cx="52" cy="52" r="2.8" fill="var(--accent-color, #818cf8)" opacity="0.9"/>' +
           '<defs><radialGradient id="hg" cx="35%" cy="35%">' +
             '<stop offset="0%" stop-color="rgba(155,160,225,0.9)"/>' +
             '<stop offset="100%" stop-color="rgba(75,80,145,0.85)"/>' +
@@ -244,15 +245,24 @@ class CeilingFanCard extends HTMLElement {
     if (isOn && lvl > 0) this._setBladeColors(lvl - 1);
   }
 
+  _getAccentColor() {
+    // Read accent color from HA theme CSS variable
+    return getComputedStyle(this).getPropertyValue('--accent-color').trim() || '#6366f1';
+  }
+
   _setBladeColors(idx) {
     const [o1, o2] = BLADE_OPS[idx];
     const r = this.shadowRoot;
-    r.getElementById('b1')?.setAttribute('fill', 'rgba(99,102,241,' + o1 + ')');
-    r.getElementById('b1')?.setAttribute('stroke', 'rgba(99,102,241,' + (o1 + 0.1) + ')');
-    r.getElementById('b2')?.setAttribute('fill', 'rgba(99,102,241,' + o2 + ')');
-    r.getElementById('b2')?.setAttribute('stroke', 'rgba(99,102,241,' + (o2 + 0.08) + ')');
-    r.getElementById('b3')?.setAttribute('fill', 'rgba(99,102,241,' + o1 + ')');
-    r.getElementById('b3')?.setAttribute('stroke', 'rgba(99,102,241,' + (o1 + 0.1) + ')');
+    const accent = this._getAccentColor();
+    // Use currentColor trick — set fill as color-mix via style attribute
+    const f1 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o1 * 100) + '%, transparent)';
+    const f2 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o2 * 100) + '%, transparent)';
+    r.getElementById('b1')?.setAttribute('fill', f1);
+    r.getElementById('b1')?.setAttribute('stroke', f1);
+    r.getElementById('b2')?.setAttribute('fill', f2);
+    r.getElementById('b2')?.setAttribute('stroke', f2);
+    r.getElementById('b3')?.setAttribute('fill', f1);
+    r.getElementById('b3')?.setAttribute('stroke', f1);
   }
 
   _startSpin(lvl) {
