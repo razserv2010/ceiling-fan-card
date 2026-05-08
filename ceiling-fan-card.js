@@ -1,3 +1,20 @@
+/**
+ * ceiling-fan-card — Home Assistant Lovelace Custom Card
+ *
+ * type: custom:ceiling-fan-card
+ * entity: fan.my_ceiling_fan
+ * name: מאוורר סלון
+ * speed_names: [חלש מאוד, חלש, בינוני-חלש, בינוני, חזק, חזק מאוד]
+ * extra_entity:
+ *   entity: switch_timer.toggle_fan
+ *   name: טיימר
+ *   icon: mdi:camera-timer
+ *   icon_color: teal
+ *   tap_action:
+ *     action: perform-action
+ *     ...
+ */
+
 const CARD_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800&display=swap');
 
@@ -159,7 +176,6 @@ const BAR_H       = [[4],[4,7],[4,7,9],[4,7,9,11],[4,7,9,11,13],[4,7,9,11,13,15]
 class CeilingFanCard extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
     this._built = false;
     this._angle = 0;
     this._currentDur = TARGET_DURS[2];
@@ -194,12 +210,10 @@ class CeilingFanCard extends HTMLElement {
   static getConfigElement() { return document.createElement('ceiling-fan-card-editor'); }
 
   _build() {
-    const r = this.shadowRoot;
-    r.innerHTML = '';
+    const r = this;
+    this.innerHTML = '';
 
-    const style = document.createElement('style');
-    style.textContent = CARD_STYLES;
-    r.appendChild(style);
+
 
     const card = document.createElement('ha-card');
 
@@ -240,7 +254,7 @@ class CeilingFanCard extends HTMLElement {
       '</div>' +
       '<div class="controls">' + btnHtml + '</div>';
 
-    r.appendChild(card);
+    this.appendChild(card);
 
     r.getElementById('power').addEventListener('click', () => this._togglePower());
     r.querySelectorAll('.spd-btn').forEach(b =>
@@ -251,7 +265,7 @@ class CeilingFanCard extends HTMLElement {
   }
 
   _buildExtraBtn() {
-    const r = this.shadowRoot;
+    const r = this;
     const btns = r.getElementById('btns');
     if (!btns || !this._extra) return;
     if (r.getElementById('extra-btn')) return; // already exists
@@ -292,7 +306,7 @@ class CeilingFanCard extends HTMLElement {
           Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1)
       : 0;
 
-    const nameEl = this.shadowRoot.getElementById('name');
+    const nameEl = this.querySelector('name');
     if (nameEl) nameEl.textContent = this._name || obj.attributes.friendly_name || 'מאוורר תקרה';
 
     if (isOn && lvl > 0) this._startSpin(lvl);
@@ -304,7 +318,7 @@ class CeilingFanCard extends HTMLElement {
   }
 
   _updateUI(isOn, lvl) {
-    const r = this.shadowRoot;
+    const r = this;
     r.getElementById('power')?.classList.toggle('on', isOn);
     r.getElementById('glow')?.classList.toggle('active', isOn && lvl > 0);
 
@@ -328,7 +342,7 @@ class CeilingFanCard extends HTMLElement {
 
   _setBladeColors(idx) {
     const [o1, o2] = BLADE_OPS[idx];
-    const r = this.shadowRoot;
+    const r = this;
     const accent = this._getAccentColor();
     const f1 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o1 * 100) + '%, transparent)';
     const f2 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o2 * 100) + '%, transparent)';
@@ -361,14 +375,14 @@ class CeilingFanCard extends HTMLElement {
       if (this._currentDur >= 20) {
         this._decelerating = false;
         this._rafId = null;
-        const spname = this.shadowRoot.getElementById('spname');
+        const spname = this.querySelector('spname');
         if (spname) { spname.textContent = 'כבוי'; spname.classList.add('off'); }
         return;
       }
     }
 
     this._angle = (this._angle + 360 / this._currentDur * dt) % 360;
-    this.shadowRoot.getElementById('blades')?.setAttribute('transform', 'rotate(' + this._angle + ' 52 52)');
+    this.querySelector('blades')?.setAttribute('transform', 'rotate(' + this._angle + ' 52 52)');
     this._rafId = requestAnimationFrame(ts => this._loop(ts));
   }
 
@@ -411,7 +425,6 @@ const EDITOR_STYLES = `
 class CeilingFanCardEditor extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
     this._config = {};
   }
 
@@ -423,7 +436,7 @@ class CeilingFanCardEditor extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     // Forward hass to all sub-elements
-    this.shadowRoot.querySelectorAll('ha-entity-picker, ha-icon-picker, ha-form, hui-action-editor')
+    this.querySelectorAll('ha-entity-picker, ha-icon-picker, ha-form, hui-action-editor')
       .forEach(el => { el.hass = hass; });
   }
 
@@ -434,8 +447,8 @@ class CeilingFanCardEditor extends HTMLElement {
   }
 
   _render() {
-    const r = this.shadowRoot;
-    r.innerHTML = '';
+    const r = this;
+    this.innerHTML = '';
 
     const style = document.createElement('style');
     style.textContent = EDITOR_STYLES;
@@ -579,6 +592,14 @@ class CeilingFanCardEditor extends HTMLElement {
         .forEach(el => { el.hass = this._hass; });
     }
   }
+}
+
+// Inject card styles into document head once
+if (!document.getElementById('ceiling-fan-card-styles')) {
+  const s = document.createElement('style');
+  s.id = 'ceiling-fan-card-styles';
+  s.textContent = CARD_STYLES;
+  document.head.appendChild(s);
 }
 
 customElements.define('ceiling-fan-card', CeilingFanCard);
