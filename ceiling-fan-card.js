@@ -4,15 +4,8 @@
  * type: custom:ceiling-fan-card
  * entity: fan.my_ceiling_fan
  * name: מאוורר סלון
+ * direction_entity: select.fan_direction  <-- תמיכה בישות נפרדת
  * speed_names: [חלש מאוד, חלש, בינוני-חלש, בינוני, חזק, חזק מאוד]
- * extra_entity:
- *   entity: switch_timer.toggle_fan
- *   name: טיימר
- *   icon: mdi:camera-timer
- *   icon_color: teal
- *   tap_action:
- *     action: perform-action
- *     ...
  */
 
 const CARD_STYLES = `
@@ -91,6 +84,17 @@ const CARD_STYLES = `
     box-shadow: 0 0 8px color-mix(in srgb, var(--fan-accent) 35%, transparent);
   }
   .power-btn.on svg { stroke: var(--fan-accent); }
+
+  /* ── כפתור כיוון ── */
+  .dir-btn svg {
+    width: 15px; height: 15px;
+    stroke: var(--fan-subtext);
+    fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    transition: transform .4s ease, stroke .3s;
+  }
+  .dir-btn:hover { border-color: var(--fan-accent); }
+  .dir-btn:hover svg { stroke: var(--fan-text); }
+  .dir-btn.reverse svg { transform: scaleX(-1); }
 
   .extra-btn {
     border-color: rgba(245,158,11,0.5);
@@ -281,6 +285,7 @@ class CeilingFanCard extends HTMLElement {
     this._lastTs = null;
     this._decelerating = false;
     this._isOn = false;
+    this._isReverse = false;
   }
 
   set hass(hass) {
@@ -299,18 +304,14 @@ class CeilingFanCard extends HTMLElement {
   }
 
   get _extra() { return this._config?.extra_entity || null; }
-  get _directionEntity() { return this._config?.direction_entity || null; }
 
   getCardSize() { return 4; }
   static getConfigElement() { return document.createElement('ceiling-fan-card-editor'); }
   static getStubConfig() { return { entity: 'fan.my_ceiling_fan' }; }
 
   _isDark() {
-    // Detect light/dark mode from HA theme
-    const bg = getComputedStyle(document.documentElement)
-      .getPropertyValue('--card-background-color').trim();
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--card-background-color').trim();
     if (!bg) return true;
-    // Parse luminance — dark if background is dark
     const m = bg.match(/\d+/g);
     if (m && m.length >= 3) {
       const lum = 0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2];
@@ -338,6 +339,9 @@ class CeilingFanCard extends HTMLElement {
       '<div class="header">' +
         '<div class="title" id="name">מאוורר תקרה</div>' +
         '<div class="btns" id="btns">' +
+          '<button class="icon-btn dir-btn" id="direction" style="display:none" title="החלף כיוון">' +
+            '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>' +
+          '</button>' +
           '<button class="icon-btn power-btn" id="power">' +
             '<svg viewBox="0 0 24 24"><path d="M12 2v6M6.3 6.3A8 8 0 1 0 17.7 6.3"/></svg>' +
           '</button>' +
@@ -375,6 +379,8 @@ class CeilingFanCard extends HTMLElement {
     r.appendChild(card);
 
     r.getElementById('power').addEventListener('click', () => this._togglePower());
+    r.getElementById('direction').addEventListener('click', () => this._toggleDirection());
+    
     r.querySelectorAll('.spd-btn').forEach(b =>
       b.addEventListener('click', () => this._setSpeed(parseInt(b.dataset.idx) + 1))
     );
@@ -426,17 +432,41 @@ class CeilingFanCard extends HTMLElement {
     const isOn = obj.state === 'on';
     let lvl = 0;
 
+    // זיהוי ישות כיוון (נפרדת או מובנית)
+    const dirBtn = this.shadowRoot.getElementById('direction');
+    let hasDirection = false;
+
+    // 1. קודם בודקים אם הוגדרה ישות נפרדת בהגדרות
+    if (this._config.direction_entity && this._hass.states[this._config.direction_entity]) {
+      hasDirection = true;
+      const dirObj = this._hass.states[this._config.direction_entity];
+      const dirStateStr = String(dirObj.state).toLowerCase();
+      // נבדוק מילים שמציינות כיוון הפוך כדי לקבוע את כיוון האנימציה והחץ
+      this._isReverse = dirStateStr.includes('reverse') || dirStateStr === 'אחורה' || dirStateStr === 'on';
+    } 
+    // 2. אם לא הוגדרה, בודקים אם יש מאפיין כיוון מובנה במאוורר
+    else if (obj.attributes && obj.attributes.direction) {
+      hasDirection = true;
+      this._isReverse = obj.attributes.direction === 'reverse';
+    }
+
+    // הצגה או הסתרה של הכפתור
+    if (hasDirection) {
+      dirBtn.style.display = 'flex';
+      dirBtn.classList.toggle('reverse', this._isReverse);
+    } else {
+      dirBtn.style.display = 'none';
+    }
+
     if (isOn) {
       const presets = obj.attributes.preset_modes;
       const currentPreset = obj.attributes.preset_mode;
 
       if (presets && currentPreset && currentPreset !== 'כבוי' && currentPreset !== 'off') {
-        // Find level by matching preset_mode to speed names
         const modes = presets.filter(p => p !== 'כבוי' && p !== 'off');
         const idx = modes.indexOf(currentPreset);
         if (idx >= 0) lvl = idx + 1;
       } else {
-        // Fallback: use percentage
         const pct = obj.attributes.percentage || 0;
         if (pct > 0) {
           lvl = SPEED_PCT.reduce((best, p, i) =>
@@ -456,15 +486,12 @@ class CeilingFanCard extends HTMLElement {
     this._buildExtraBtn();
     this._syncPresets(obj);
     this._syncEntities();
-
-    // Apply light mode adjustments if needed
   }
 
   _applyTheme() {
     const card = this.shadowRoot.querySelector('ha-card');
     if (!card) return;
     const dark = this._isDark();
-    // In light mode make divider and bg2 more visible
     if (!dark) {
       card.style.setProperty('--fan-divider', 'rgba(0,0,0,0.15)');
       card.style.setProperty('--fan-bg2', 'rgba(0,0,0,0.05)');
@@ -483,7 +510,6 @@ class CeilingFanCard extends HTMLElement {
     const selected = r.getElementById('preset-selected');
     if (!section || !list || !selected) return;
 
-    // Get preset_modes — exclude speed-related presets (כבוי + the 6 speed names)
     const allPresets  = obj.attributes.preset_modes || [];
     const speedNames  = new Set([...this._speedNames, 'כבוי', 'off']);
     const presets     = allPresets.filter(p => !speedNames.has(p));
@@ -496,7 +522,6 @@ class CeilingFanCard extends HTMLElement {
     section.style.display = 'block';
     const currentPreset = obj.attributes.preset_mode || '';
 
-    // Rebuild list only if presets changed
     const existing = [...list.querySelectorAll('.preset-item')].map(el => el.dataset.preset);
     if (JSON.stringify(existing) !== JSON.stringify(presets)) {
       list.innerHTML = '';
@@ -518,13 +543,11 @@ class CeilingFanCard extends HTMLElement {
         list.appendChild(item);
       });
     } else {
-      // Just update active state
       list.querySelectorAll('.preset-item').forEach(el => {
         el.classList.toggle('active', el.dataset.preset === currentPreset);
       });
     }
 
-    // Update selected label
     const activePreset = presets.includes(currentPreset) ? currentPreset : presets[0];
     selected.textContent = activePreset;
   }
@@ -575,7 +598,6 @@ class CeilingFanCard extends HTMLElement {
           nameEl.textContent = name;
           row.appendChild(nameEl);
 
-          // Chips — options displayed inline, no dropdown
           const chips = document.createElement('div');
           chips.className = 'select-chips';
           chips.id = id + '-chips';
@@ -619,7 +641,6 @@ class CeilingFanCard extends HTMLElement {
 
         section.appendChild(row);
       } else {
-        // Update
         if (isSelect) {
           const chipsEl = r.getElementById(id + '-chips');
           if (chipsEl) chipsEl.querySelectorAll('.select-chip').forEach(c => {
@@ -654,7 +675,6 @@ class CeilingFanCard extends HTMLElement {
     const action = tapAction?.action || 'more-info';
 
     if (action === 'more-info') {
-      // Direct more-info — most reliable way
       this.dispatchEvent(new CustomEvent('hass-more-info', {
         bubbles: true, composed: true,
         detail: { entityId: cfg.entity },
@@ -674,15 +694,12 @@ class CeilingFanCard extends HTMLElement {
       history.pushState(null, '', tapAction.navigation_path);
       window.dispatchEvent(new CustomEvent('location-changed', { bubbles: true, composed: true }));
     } else {
-      // Fallback — fire hass-action
       this.dispatchEvent(new CustomEvent('hass-action', {
         bubbles: true, composed: true,
         detail: { config: { entity: cfg.entity, tap_action: tapAction }, action: 'tap' },
       }));
     }
   }
-
-
 
   _updateUI(isOn, lvl) {
     const r = this.shadowRoot;
@@ -746,7 +763,9 @@ class CeilingFanCard extends HTMLElement {
       }
     }
 
-    this._angle = (this._angle + 360 / this._currentDur * dt) % 360;
+    const dirMult = this._isReverse ? -1 : 1;
+    this._angle = (this._angle + (360 / this._currentDur * dt * dirMult)) % 360;
+    
     this.shadowRoot.getElementById('blades')?.setAttribute('transform', 'rotate(' + this._angle + ' 52 52)');
     this._rafId = requestAnimationFrame(ts => this._loop(ts));
   }
@@ -756,12 +775,53 @@ class CeilingFanCard extends HTMLElement {
     this._hass.callService('fan', isOn ? 'turn_off' : 'turn_on', { entity_id: this._entity });
   }
 
+  _toggleDirection() {
+    // 1. טיפול בישות כיוון נפרדת (אם הוגדרה)
+    if (this._config.direction_entity && this._hass?.states[this._config.direction_entity]) {
+      const dirObj = this._hass.states[this._config.direction_entity];
+      const domain = this._config.direction_entity.split('.')[0];
+
+      if (['select', 'input_select'].includes(domain)) {
+        const options = dirObj.attributes.options || [];
+        if (options.length > 0) {
+          // עובר לאפשרות הבאה ברשימה (במעגל)
+          const currentIndex = options.indexOf(dirObj.state);
+          const nextIndex = (currentIndex + 1) % options.length;
+          this._hass.callService(domain, 'select_option', {
+            entity_id: this._config.direction_entity,
+            option: options[nextIndex]
+          });
+        }
+      } else if (['switch', 'input_boolean'].includes(domain)) {
+        this._hass.callService(domain, 'toggle', { entity_id: this._config.direction_entity });
+      }
+
+      // מחליפים מצב חזותי באופן מיידי לתחושת תגובתיות
+      this._isReverse = !this._isReverse;
+      this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
+
+    } 
+    // 2. טיפול במאפיין הכיוון המובנה של המאוורר (גיבוי מקורי)
+    else {
+      const obj = this._hass?.states[this._entity];
+      if (!obj || !obj.attributes.direction) return;
+      const newDir = obj.attributes.direction === 'forward' ? 'reverse' : 'forward';
+      
+      this._hass.callService('fan', 'set_direction', {
+        entity_id: this._entity,
+        direction: newDir
+      });
+
+      this._isReverse = newDir === 'reverse';
+      this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
+    }
+  }
+
   _setSpeed(n) {
     const obj = this._hass?.states[this._entity];
     const presets = obj?.attributes?.preset_modes;
 
     if (presets && presets.length > 0) {
-      // Use preset_mode — skip "כבוי" as first preset if exists
       const modes = presets.filter(p => p !== 'כבוי' && p !== 'off');
       const mode = modes[n - 1];
       if (mode) {
@@ -772,7 +832,6 @@ class CeilingFanCard extends HTMLElement {
         return;
       }
     }
-    // Fallback to percentage
     this._hass.callService('fan', 'turn_on', { entity_id: this._entity, percentage: SPEED_PCT[n - 1] });
   }
 
@@ -790,17 +849,54 @@ class CeilingFanCard extends HTMLElement {
 
 /* ══ Editor ══ */
 const EDITOR_STYLES = `
-  :host { display: block; }
-  .root { padding: 4px 0; }
-  ha-form { display: block; }
-  .section-title {
-    font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
-    color: var(--secondary-text-color); margin: 20px 0 8px;
-    padding-bottom: 4px; border-bottom: 1px solid var(--divider-color);
+  :host { display: block; font-family: var(--paper-font-common-base_-_font-family); }
+  .root { padding: 16px 0; }
+  ha-form { display: block; margin-bottom: 24px; }
+  
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    margin-top: 24px;
   }
-  .extra-block { border: 1px solid var(--divider-color); border-radius: 8px; padding: 12px; margin-top: 8px; }
-  ha-entity-picker, ha-icon-picker { display: block; margin-bottom: 12px; }
-  ha-formfield { display: block; }
+  .section-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--primary-text-color);
+  }
+  
+  .list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--secondary-background-color);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border: 1px solid var(--divider-color);
+    position: relative;
+  }
+  .list-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  ha-icon {
+    cursor: pointer;
+    color: var(--secondary-text-color);
+    transition: color 0.2s;
+  }
+  ha-icon:hover {
+    color: var(--primary-text-color);
+  }
+  
+  .add-entity-row {
+    margin-top: 16px;
+  }
 `;
 
 class CeilingFanCardEditor extends HTMLElement {
@@ -815,8 +911,9 @@ class CeilingFanCardEditor extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (!this.shadowRoot.querySelector('.root')) { this._render(); }
-    this.shadowRoot.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker, ha-yaml-editor')
-      .forEach(el => { if (el.hass !== undefined) el.hass = hass; });
+    this.shadowRoot.querySelectorAll('ha-form, ha-entity-picker').forEach(el => {
+      if (el.hass !== undefined) el.hass = hass;
+    });
   }
 
   _fire() {
@@ -834,31 +931,44 @@ class CeilingFanCardEditor extends HTMLElement {
 
     const root = document.createElement('div');
     root.className = 'root';
+    root.setAttribute('dir', 'rtl');
 
-    // Main form
+    // 1. הגדרות ראשיות
     const mainForm = document.createElement('ha-form');
     mainForm.hass = this._hass;
     mainForm.schema = [
-      { name: 'entity', required: true, selector: { entity: { domain: 'fan' } } },
+      { name: 'entity', selector: { entity: { domain: 'fan' } } },
       { name: 'name', selector: { text: {} } },
+      { name: 'direction_entity', selector: { entity: {} } }, // שדה לישות כיוון נפרדת
     ];
-    mainForm.data = { entity: this._config.entity || '', name: this._config.name || '' };
-    mainForm.computeLabel = s => ({ entity: 'ישות מאוורר', name: 'שם מותאם' })[s.name] || s.name;
+    mainForm.data = { 
+      entity: this._config.entity || '', 
+      name: this._config.name || '',
+      direction_entity: this._config.direction_entity || '' 
+    };
+    mainForm.computeLabel = s => ({ 
+      entity: 'ישות מאוורר ראשי (חובה)', 
+      name: 'שם לתצוגה בכרטיס',
+      direction_entity: 'ישות כיוון נפרדת (אופציונלי - Select/Switch)'
+    })[s.name] || s.name;
     mainForm.addEventListener('value-changed', e => {
       this._config = { ...this._config, ...e.detail.value }; this._fire();
     });
     root.appendChild(mainForm);
 
-    // Speed names
-    const speedTitle = document.createElement('div');
-    speedTitle.className = 'section-title';
-    speedTitle.textContent = 'שמות מהירויות';
-    root.appendChild(speedTitle);
+    // 2. שמות מהירויות
+    const speedHeader = document.createElement('div');
+    speedHeader.className = 'section-header';
+    speedHeader.innerHTML = '<h3>שמות מהירויות (לפי סדר עולה)</h3>';
+    root.appendChild(speedHeader);
 
     const names = Array.isArray(this._config.speed_names) ? this._config.speed_names : DEFAULT_SPEED_NAMES;
     const speedForm = document.createElement('ha-form');
     speedForm.hass = this._hass;
-    speedForm.schema = names.map((_, i) => ({ name: 'speed_' + (i+1), selector: { text: {} } }));
+    speedForm.schema = [{
+      type: "grid", name: "",
+      schema: names.map((_, i) => ({ name: 'speed_' + (i+1), selector: { text: {} } }))
+    }];
     speedForm.data = Object.fromEntries(names.map((n, i) => ['speed_' + (i+1), n]));
     speedForm.computeLabel = s => 'מהירות ' + s.name.replace('speed_', '');
     speedForm.addEventListener('value-changed', e => {
@@ -867,16 +977,16 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(speedForm);
 
-    // Extra entity
-    const extraTitle = document.createElement('div');
-    extraTitle.className = 'section-title';
-    extraTitle.textContent = 'ישות נוספת (כפתור)';
-    root.appendChild(extraTitle);
-
-    const extra = this._config.extra_entity || null;
+    // 3. כפתור אקסטרה
+    const extraHeader = document.createElement('div');
+    extraHeader.className = 'section-header';
+    extraHeader.innerHTML = '<h3>כפתור פעולה נוסף (מופיע ליד כפתור ההדלקה)</h3>';
+    
+    const extraToggleWrapper = document.createElement('div');
     const extraToggle = document.createElement('ha-formfield');
-    extraToggle.style.cssText = 'display:flex;align-items:center;flex-direction:row-reverse;justify-content:flex-end;gap:8px;margin-bottom:8px';
-    extraToggle.innerHTML = '<ha-switch id="extra-sw"' + (extra ? ' checked' : '') + '></ha-switch><span style="margin-right:8px;font-size:14px;color:var(--primary-text-color)">הוסף ישות לכרטיס</span>';
+    extraToggle.label = 'הצג כפתור נוסף';
+    const extra = this._config.extra_entity || null;
+    extraToggle.innerHTML = `<ha-switch ${extra ? 'checked' : ''}></ha-switch>`;
     extraToggle.querySelector('ha-switch').addEventListener('change', e => {
       if (e.target.checked) {
         this._config = { ...this._config, extra_entity: { entity: '' } };
@@ -886,54 +996,38 @@ class CeilingFanCardEditor extends HTMLElement {
       }
       this._fire(); this._render();
     });
-    root.appendChild(extraToggle);
+    extraToggleWrapper.appendChild(extraToggle);
+    extraHeader.appendChild(extraToggleWrapper);
+    root.appendChild(extraHeader);
 
     if (extra) {
-      const extraBlock = document.createElement('div');
-      extraBlock.className = 'extra-block';
-
       const extraForm = document.createElement('ha-form');
       extraForm.hass = this._hass;
       extraForm.schema = [
-        { name: 'entity', required: true, selector: { entity: {} } },
-        { name: 'name',   selector: { text: {} } },
-        { name: 'icon',   selector: { icon: {} } },
-        { name: 'icon_color', selector: { ui_color: {} } },
+        { name: 'entity', selector: { entity: {} } },
+        { name: 'name', selector: { text: {} } },
+        { type: "grid", name: "", schema: [
+          { name: 'icon', selector: { icon: {} } },
+          { name: 'icon_color', selector: { ui_color: {} } }
+        ]}
       ];
       extraForm.data = {
         entity: extra.entity || '', name: extra.name || '',
         icon: extra.icon || '', icon_color: extra.icon_color || '',
       };
-      extraForm.computeLabel = s => ({ entity: 'ישות', name: 'שם תווית', icon: 'אייקון', icon_color: 'צבע' })[s.name] || s.name;
+      extraForm.computeLabel = s => ({ entity: 'ישות', name: 'שם (אופציונלי)', icon: 'אייקון', icon_color: 'צבע אייקון' })[s.name] || s.name;
       extraForm.addEventListener('value-changed', e => {
         this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, ...e.detail.value } };
         this._fire();
       });
-      extraBlock.appendChild(extraForm);
-
-      // tap_action via yaml editor
-      const tapLabel = document.createElement('div');
-      tapLabel.style.cssText = 'font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--secondary-text-color);margin:10px 0 4px;padding-bottom:4px;border-bottom:1px solid var(--divider-color)';
-      tapLabel.textContent = 'tap_action';
-      extraBlock.appendChild(tapLabel);
-
-      const extraYaml = document.createElement('ha-yaml-editor');
-      extraYaml.defaultValue = extra.tap_action || { action: 'more-info' };
-      extraYaml.addEventListener('value-changed', e => {
-        if (!e.detail.isValid) return;
-        this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value } };
-        this._fire();
-      });
-      extraBlock.appendChild(extraYaml);
-
-      root.appendChild(extraBlock);
+      root.appendChild(extraForm);
     }
 
-    // Entities list
-    const entitiesTitle = document.createElement('div');
-    entitiesTitle.className = 'section-title';
-    entitiesTitle.textContent = 'ישויות נוספות';
-    root.appendChild(entitiesTitle);
+    // 4. ישויות נוספות
+    const entitiesHeader = document.createElement('div');
+    entitiesHeader.className = 'section-header';
+    entitiesHeader.innerHTML = '<h3>ישויות נוספות (שורות בתחתית)</h3>';
+    root.appendChild(entitiesHeader);
 
     const entities = this._config.entities || [];
     const entitiesContainer = document.createElement('div');
@@ -942,11 +1036,10 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(entitiesContainer);
 
-    // Add entity picker
     const addWrap = document.createElement('div');
-    addWrap.style.cssText = 'margin-top:8px';
+    addWrap.className = 'add-entity-row';
     const newPicker = document.createElement('ha-entity-picker');
-    newPicker.label = '+ הוסף ישות';
+    newPicker.label = 'בחר ישות להוספה...';
     newPicker.value = '';
     newPicker.allowCustomEntity = false;
     if (this._hass) newPicker.hass = this._hass;
@@ -960,48 +1053,45 @@ class CeilingFanCardEditor extends HTMLElement {
     root.appendChild(addWrap);
 
     r.appendChild(root);
-
-    if (this._hass) {
-      r.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker').forEach(el => { el.hass = this._hass; });
-    }
   }
 
   _buildEntityRow(cfg, i) {
     const row = document.createElement('div');
-    row.style.cssText = 'border:1px solid var(--divider-color);border-radius:8px;padding:12px 12px 8px;margin-bottom:8px;position:relative';
+    row.className = 'list-item';
 
-    // Delete button
-    const delBtn = document.createElement('button');
-    delBtn.style.cssText = 'position:absolute;top:6px;left:6px;background:none;border:none;cursor:pointer;padding:2px;color:var(--secondary-text-color);display:flex;align-items:center';
-    const delIcon = document.createElement('ha-icon');
-    delIcon.setAttribute('icon', 'mdi:close');
-    delIcon.style.setProperty('--mdc-icon-size', '18px');
-    delBtn.appendChild(delIcon);
-    delBtn.addEventListener('click', () => {
-      const updated = [...(this._config.entities || [])];
-      updated.splice(i, 1);
-      this._config = { ...this._config, entities: updated };
-      this._fire(); this._render();
-    });
-    row.appendChild(delBtn);
+    const content = document.createElement('div');
+    content.className = 'list-item-content';
 
-    // Entity + name + icon
     const form = document.createElement('ha-form');
-    form.hass   = this._hass;
+    form.hass = this._hass;
     form.schema = [
-      { name: 'entity', required: true, selector: { entity: {} } },
-      { name: 'name',   selector: { text: {} } },
-      { name: 'icon',   selector: { icon: {} } },
+      { name: 'entity', selector: { entity: {} } },
+      { type: "grid", name: "", schema: [
+        { name: 'name', selector: { text: {} } },
+        { name: 'icon', selector: { icon: {} } }
+      ]}
     ];
     form.data = { entity: cfg.entity || '', name: cfg.name || '', icon: cfg.icon || '' };
-    form.computeLabel = s => ({ entity: 'ישות', name: 'שם תווית', icon: 'אייקון' })[s.name] || s.name;
+    form.computeLabel = s => ({ entity: 'ישות', name: 'שם דורס', icon: 'אייקון' })[s.name] || s.name;
     form.addEventListener('value-changed', e => {
       const updated = [...(this._config.entities || [])];
       updated[i] = { ...updated[i], ...e.detail.value };
       this._config = { ...this._config, entities: updated };
       this._fire();
     });
-    row.appendChild(form);
+    
+    content.appendChild(form);
+    row.appendChild(content);
+
+    const delIcon = document.createElement('ha-icon');
+    delIcon.setAttribute('icon', 'mdi:delete');
+    delIcon.addEventListener('click', () => {
+      const updated = [...(this._config.entities || [])];
+      updated.splice(i, 1);
+      this._config = { ...this._config, entities: updated };
+      this._fire(); this._render();
+    });
+    row.appendChild(delIcon);
 
     return row;
   }
@@ -1014,6 +1104,6 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'ceiling-fan-card',
   name: 'Ceiling Fan Card',
-  description: 'כרטיס מאוורר תקרה — 3 להבים, עצירה הדרגתית, ישויות נוספות',
+  description: 'כרטיס מאוורר תקרה — 3 להבים, תמיכה בכיוון מובנה או ישות נפרדת',
   preview: true,
 });
