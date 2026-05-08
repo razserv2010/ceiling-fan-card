@@ -104,18 +104,88 @@ class CeilingFanCard extends HTMLElement {
 
   setConfig(config) {
     if (!config.entity) throw new Error('entity is required');
-    this._config     = config;
-    this._entity     = config.entity;
-    this._name       = config.name || null;
-    this._speedNames = config.speed_names || DEFAULT_SPEED_NAMES;
+    this._config = config;
+    this._entity = config.entity;
+    this._name   = config.name || null;
+
+    // Speed names — from flat keys or array
+    const sn = config.speed_names;
+    if (Array.isArray(sn)) {
+      this._speedNames = sn;
+    } else if (sn && typeof sn === 'object') {
+      // getConfigForm returns flat keys: speed_1..speed_6
+      this._speedNames = DEFAULT_SPEED_NAMES.map((d, i) => sn['speed_' + (i+1)] || d);
+    } else {
+      this._speedNames = DEFAULT_SPEED_NAMES;
+    }
+
     if (this._built) { this._built = false; this._build(); this._built = true; }
   }
 
-  get _extra() { return this._config?.extra_entity || null; }
+  get _extra() {
+    const c = this._config;
+    if (!c) return null;
+    // Support both flat keys (getConfigForm) and nested extra_entity object (YAML)
+    if (c.extra_entity && typeof c.extra_entity === 'object') return c.extra_entity;
+    if (c.extra_entity && typeof c.extra_entity === 'string') {
+      return {
+        entity:     c.extra_entity,
+        name:       c.extra_entity_name,
+        icon:       c.extra_entity_icon,
+        icon_color: c.extra_entity_color,
+        tap_action: c.extra_tap_action,
+      };
+    }
+    return null;
+  }
 
   getCardSize() { return this._extra ? 5 : 4; }
-  static getConfigElement() { return document.createElement('ceiling-fan-card-editor'); }
+
   static getStubConfig() { return { entity: 'fan.my_ceiling_fan' }; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        {
+          name: 'entity',
+          selector: { entity: { domain: 'fan' } },
+        },
+        {
+          name: 'name',
+          selector: { text: {} },
+        },
+        {
+          type: 'expandable',
+          name: 'speed_names',
+          title: 'שמות מהירויות',
+          schema: [
+            { name: 'speed_1', selector: { text: {} } },
+            { name: 'speed_2', selector: { text: {} } },
+            { name: 'speed_3', selector: { text: {} } },
+            { name: 'speed_4', selector: { text: {} } },
+            { name: 'speed_5', selector: { text: {} } },
+            { name: 'speed_6', selector: { text: {} } },
+          ],
+        },
+        {
+          type: 'expandable',
+          name: 'extra_entity',
+          title: 'ישות נוספת',
+          schema: [
+            { name: 'extra_entity',       selector: { entity: {} } },
+            { name: 'extra_entity_name',  selector: { text: {} } },
+            { name: 'extra_entity_icon',  selector: { icon: {} } },
+            { name: 'extra_entity_color', selector: { ui_color: {} } },
+            { name: 'extra_tap_action',   selector: { action: {} } },
+          ],
+        },
+      ],
+      assertConfig: (config) => {
+        if (!config.entity) throw new Error('entity is required');
+      },
+      computeLabel: (schema) => LABELS[schema.name] || schema.name,
+    };
+  }
 
   _build() {
     const r = this.shadowRoot;
@@ -318,182 +388,23 @@ class CeilingFanCard extends HTMLElement {
   }
 }
 
-/* ══ Editor ══ */
-const EDITOR_STYLES = `
-  :host { display: block; }
-  .wrap { padding: 4px 0; }
-  .sec-title {
-    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
-    color: var(--secondary-text-color);
-    margin: 18px 0 10px; padding-bottom: 5px;
-    border-bottom: 1px solid var(--divider-color);
-  }
-  .field { margin-bottom: 12px; }
-  .speed-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  ha-textfield, ha-entity-picker, ha-icon-picker, ha-yaml-editor { width: 100%; display: block; }
-  .toggle-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 12px; background: var(--secondary-background-color);
-    border-radius: 8px; cursor: pointer;
-  }
-  .toggle-lbl { font-size: 14px; color: var(--primary-text-color); }
-  .toggle-sub { font-size: 12px; color: var(--secondary-text-color); margin-top: 2px; }
-  .extra-block { margin-top: 10px; padding: 12px; background: var(--secondary-background-color); border-radius: 8px; }
-`;
+/* ══ Editor — uses HA native getConfigForm ══ */
 
-class CeilingFanCardEditor extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: 'open' });
-    this._config = {};
-  }
-
-  setConfig(config) { this._config = { ...config }; this._render(); }
-
-  set hass(hass) {
-    this._hass = hass;
-    this.shadowRoot.querySelectorAll('ha-entity-picker,ha-icon-picker,ha-form').forEach(el => { el.hass = hass; });
-  }
-
-  _fire() {
-    this.dispatchEvent(new CustomEvent('config-changed', {
-      detail: { config: this._config }, bubbles: true, composed: true
-    }));
-  }
-
-  _render() {
-    const r = this.shadowRoot;
-    r.innerHTML = '';
-
-    const style = document.createElement('style');
-    style.textContent = EDITOR_STYLES;
-    r.appendChild(style);
-
-    const wrap = document.createElement('div');
-    wrap.className = 'wrap';
-
-    const names    = this._config.speed_names || DEFAULT_SPEED_NAMES;
-    const extra    = this._config.extra_entity || null;
-    const hasExtra = !!extra;
-
-    const speedInputs = names.map((n, i) =>
-      '<div class="field"><ha-textfield data-speed="' + i + '" label="מהירות ' + (i+1) + '" value="' + n + '"></ha-textfield></div>'
-    ).join('');
-
-    wrap.innerHTML =
-      '<div class="sec-title">מאוורר</div>' +
-      '<div class="field" id="fan-picker-wrap"></div>' +
-      '<div class="field"><ha-textfield id="f-name" label="שם מותאם (אופציונלי)" value="' + (this._config.name || '') + '"></ha-textfield></div>' +
-      '<div class="sec-title">שמות מהירויות</div>' +
-      '<div class="speed-grid">' + speedInputs + '</div>' +
-      '<div class="sec-title">ישות נוספת</div>' +
-      '<div class="toggle-row" id="extra-toggle">' +
-        '<div><div class="toggle-lbl">הוסף ישות לכרטיס</div><div class="toggle-sub">כל ישות — switch, input_boolean, script ועוד</div></div>' +
-        '<ha-switch id="extra-sw"' + (hasExtra ? ' checked' : '') + '></ha-switch>' +
-      '</div>' +
-      '<div class="extra-block" id="extra-block" style="display:' + (hasExtra ? 'block' : 'none') + '">' +
-        '<div id="extra-picker-wrap"></div>' +
-        '<div class="field"><ha-textfield id="f-extra-name" label="שם תווית" value="' + (extra?.name || '') + '"></ha-textfield></div>' +
-        '<div class="field" id="icon-picker-wrap"></div>' +
-        '<div class="field" id="color-picker-wrap"></div>' +
-        '<div class="sec-title" style="margin-top:8px">tap_action</div>' +
-        '<div id="tap-yaml-wrap"></div>' +
-      '</div>';
-
-    r.appendChild(wrap);
-
-    // Fan picker
-    const fanPicker = document.createElement('ha-entity-picker');
-    fanPicker.label = 'Entity (fan.*)';
-    fanPicker.value = this._config.entity || '';
-    fanPicker.includeDomains = ['fan'];
-    fanPicker.allowCustomEntity = false;
-    if (this._hass) fanPicker.hass = this._hass;
-    fanPicker.addEventListener('value-changed', e => {
-      this._config = { ...this._config, entity: e.detail.value }; this._fire();
-    });
-    r.getElementById('fan-picker-wrap').appendChild(fanPicker);
-
-    // Extra entity picker
-    const extraPicker = document.createElement('ha-entity-picker');
-    extraPicker.label = 'Entity';
-    extraPicker.value = extra?.entity || '';
-    extraPicker.allowCustomEntity = true;
-    if (this._hass) extraPicker.hass = this._hass;
-    extraPicker.addEventListener('value-changed', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, entity: e.detail.value } };
-      this._fire();
-    });
-    r.getElementById('extra-picker-wrap').appendChild(extraPicker);
-
-    // Icon picker
-    const iconPicker = document.createElement('ha-icon-picker');
-    iconPicker.label = 'אייקון';
-    iconPicker.value = extra?.icon || '';
-    if (this._hass) iconPicker.hass = this._hass;
-    iconPicker.addEventListener('value-changed', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, icon: e.detail.value } };
-      this._fire();
-    });
-    r.getElementById('icon-picker-wrap').appendChild(iconPicker);
-
-    // Color picker
-    const colorForm = document.createElement('ha-form');
-    colorForm.hass = this._hass;
-    colorForm.schema = [{ name: 'icon_color', selector: { ui_color: {} } }];
-    colorForm.data = { icon_color: extra?.icon_color || 'amber' };
-    colorForm.computeLabel = () => 'צבע אייקון';
-    colorForm.addEventListener('value-changed', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, icon_color: e.detail.value.icon_color } };
-      this._fire();
-    });
-    r.getElementById('color-picker-wrap').appendChild(colorForm);
-
-    // YAML editor for tap_action
-    const yamlEditor = document.createElement('ha-yaml-editor');
-    yamlEditor.label = 'tap_action';
-    yamlEditor.defaultValue = extra?.tap_action || { action: 'more-info' };
-    yamlEditor.addEventListener('value-changed', e => {
-      if (e.detail.isValid) {
-        this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value } };
-        this._fire();
-      }
-    });
-    r.getElementById('tap-yaml-wrap').appendChild(yamlEditor);
-
-    // Events
-    r.getElementById('f-name').addEventListener('change', e => {
-      this._config = { ...this._config, name: e.target.value || undefined }; this._fire();
-    });
-
-    r.querySelectorAll('[data-speed]').forEach(el => {
-      el.addEventListener('change', e => {
-        const updated = [...(this._config.speed_names || DEFAULT_SPEED_NAMES)];
-        updated[parseInt(e.target.dataset.speed)] = e.target.value;
-        this._config = { ...this._config, speed_names: updated }; this._fire();
-      });
-    });
-
-    r.getElementById('f-extra-name').addEventListener('change', e => {
-      this._config = { ...this._config, extra_entity: { ...this._config.extra_entity, name: e.target.value || undefined } };
-      this._fire();
-    });
-
-    const extraBlock = r.getElementById('extra-block');
-    r.getElementById('extra-toggle').addEventListener('click', () => {
-      const sw = r.getElementById('extra-sw');
-      sw.checked = !sw.checked;
-      extraBlock.style.display = sw.checked ? 'block' : 'none';
-      if (!sw.checked) {
-        const { extra_entity, ...rest } = this._config;
-        this._config = rest;
-      } else {
-        this._config = { ...this._config, extra_entity: { entity: '' } };
-      }
-      this._fire();
-    });
-  }
-}
+const LABELS = {
+  entity:      'ישות מאוורר (fan.*)',
+  name:        'שם מותאם',
+  speed_1:     'מהירות 1',
+  speed_2:     'מהירות 2',
+  speed_3:     'מהירות 3',
+  speed_4:     'מהירות 4',
+  speed_5:     'מהירות 5',
+  speed_6:     'מהירות 6',
+  extra_entity:        'ישות נוספת',
+  extra_entity_name:   'שם תווית',
+  extra_entity_icon:   'אייקון',
+  extra_entity_color:  'צבע אייקון',
+  extra_tap_action:    'tap_action',
+};
 
 customElements.define('ceiling-fan-card', CeilingFanCard);
 customElements.define('ceiling-fan-card-editor', CeilingFanCardEditor);
