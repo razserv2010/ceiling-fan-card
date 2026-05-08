@@ -440,9 +440,9 @@ class CeilingFanCard extends HTMLElement {
     if (this._config.direction_entity && this._hass.states[this._config.direction_entity]) {
       hasDirection = true;
       const dirObj = this._hass.states[this._config.direction_entity];
-      const dirStateStr = String(dirObj.state).toLowerCase().trim();
-      // תמיכה ב-reverse, חורף, on
-      this._isReverse = (dirStateStr === 'reverse' || dirStateStr === 'חורף' || dirStateStr === 'on');
+      const dirStateStr = String(dirObj.state).trim();
+      // "חורף" נחשב כאנימציה הפוכה (reverse)
+      this._isReverse = (dirStateStr.toLowerCase() === 'reverse' || dirStateStr === 'חורף' || dirStateStr === 'on');
     } 
     // 2. גיבוי - מאפיין כיוון מובנה במאוורר
     else if (obj.attributes && obj.attributes.direction) {
@@ -780,28 +780,36 @@ class CeilingFanCard extends HTMLElement {
     if (this._config.direction_entity && this._hass?.states[this._config.direction_entity]) {
       const dirObj = this._hass.states[this._config.direction_entity];
       const domain = this._config.direction_entity.split('.')[0];
+      const currentState = String(dirObj.state).trim();
 
       if (['select', 'input_select'].includes(domain)) {
-        // משיג את האפשרויות הזמינות ישירות מהישות (למשל: ['קיץ', 'חורף'])
-        const options = dirObj.attributes.options || [];
+        // משיג את האפשרויות הזמינות ישירות מהישות (למשל: ['קיץ', 'חורף']). 
+        // אם משום מה אין רשימה, מניח שזה 'קיץ' ו-'חורף' כגיבוי.
+        const options = dirObj.attributes.options || ['קיץ', 'חורף'];
+        let nextOption;
+        
         if (options.length > 0) {
-          const currentIndex = options.indexOf(dirObj.state);
-          // מעביר לאפשרות הבאה במערך
+          const currentIndex = options.indexOf(currentState);
           const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % options.length : 0;
-          const nextOption = options[nextIndex];
-          
-          this._hass.callService(domain, 'select_option', {
-            entity_id: this._config.direction_entity,
-            option: nextOption
-          });
-
-          // עדכון מיידי של התצוגה והאנימציה לפי האפשרות שנבחרה
-          this._isReverse = (String(nextOption).toLowerCase() === 'reverse' || nextOption === 'חורף');
-          this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
+          nextOption = options[nextIndex];
+        } else {
+          nextOption = currentState === 'קיץ' ? 'חורף' : 'קיץ';
         }
+        
+        this._hass.callService(domain, 'select_option', {
+          entity_id: this._config.direction_entity,
+          option: nextOption
+        });
+
+        // עדכון מיידי של התצוגה והאנימציה לפי האפשרות שנבחרה
+        this._isReverse = (String(nextOption).toLowerCase() === 'reverse' || nextOption === 'חורף' || nextOption === 'on');
+        this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
 
       } else if (['switch', 'input_boolean'].includes(domain)) {
         this._hass.callService(domain, 'toggle', { entity_id: this._config.direction_entity });
+        // עדכון חזותי ל-switch
+        this._isReverse = !this._isReverse;
+        this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
       }
 
     } 
