@@ -305,11 +305,26 @@ class CeilingFanCard extends HTMLElement {
     if (!obj) return;
 
     const isOn = obj.state === 'on';
-    const pct  = obj.attributes.percentage || 0;
-    const lvl  = isOn && pct > 0
-      ? SPEED_PCT.reduce((best, p, i) =>
-          Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1)
-      : 0;
+    let lvl = 0;
+
+    if (isOn) {
+      const presets = obj.attributes.preset_modes;
+      const currentPreset = obj.attributes.preset_mode;
+
+      if (presets && currentPreset && currentPreset !== 'כבוי' && currentPreset !== 'off') {
+        // Find level by matching preset_mode to speed names
+        const modes = presets.filter(p => p !== 'כבוי' && p !== 'off');
+        const idx = modes.indexOf(currentPreset);
+        if (idx >= 0) lvl = idx + 1;
+      } else {
+        // Fallback: use percentage
+        const pct = obj.attributes.percentage || 0;
+        if (pct > 0) {
+          lvl = SPEED_PCT.reduce((best, p, i) =>
+            Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1);
+        }
+      }
+    }
 
     const nameEl = this.shadowRoot.getElementById('name');
     if (nameEl) nameEl.textContent = this._name || obj.attributes.friendly_name || 'מאוורר תקרה';
@@ -413,6 +428,22 @@ class CeilingFanCard extends HTMLElement {
   }
 
   _setSpeed(n) {
+    const obj = this._hass?.states[this._entity];
+    const presets = obj?.attributes?.preset_modes;
+
+    if (presets && presets.length > 0) {
+      // Use preset_mode — skip "כבוי" as first preset if exists
+      const modes = presets.filter(p => p !== 'כבוי' && p !== 'off');
+      const mode = modes[n - 1];
+      if (mode) {
+        this._hass.callService('fan', 'turn_on', {
+          entity_id: this._entity,
+          preset_mode: mode,
+        });
+        return;
+      }
+    }
+    // Fallback to percentage
     this._hass.callService('fan', 'turn_on', { entity_id: this._entity, percentage: SPEED_PCT[n - 1] });
   }
 
