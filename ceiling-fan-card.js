@@ -440,14 +440,14 @@ class CeilingFanCard extends HTMLElement {
     if (this._config.direction_entity && this._hass.states[this._config.direction_entity]) {
       hasDirection = true;
       const dirObj = this._hass.states[this._config.direction_entity];
-      const dirStateStr = String(dirObj.state).toLowerCase();
-      // נבדוק מילים שמציינות כיוון הפוך כדי לקבוע את כיוון האנימציה והחץ
-      this._isReverse = dirStateStr.includes('reverse') || dirStateStr === 'אחורה' || dirStateStr === 'on';
+      const dirStateStr = String(dirObj.state).toLowerCase().trim();
+      // בדיקה מדויקת לפי הסטטוסים שאמרת
+      this._isReverse = (dirStateStr === 'reverse');
     } 
     // 2. אם לא הוגדרה, בודקים אם יש מאפיין כיוון מובנה במאוורר
     else if (obj.attributes && obj.attributes.direction) {
       hasDirection = true;
-      this._isReverse = obj.attributes.direction === 'reverse';
+      this._isReverse = (obj.attributes.direction === 'reverse');
     }
 
     // הצגה או הסתרה של הכפתור
@@ -780,25 +780,24 @@ class CeilingFanCard extends HTMLElement {
     if (this._config.direction_entity && this._hass?.states[this._config.direction_entity]) {
       const dirObj = this._hass.states[this._config.direction_entity];
       const domain = this._config.direction_entity.split('.')[0];
+      const currentState = String(dirObj.state).toLowerCase().trim();
 
       if (['select', 'input_select'].includes(domain)) {
-        const options = dirObj.attributes.options || [];
-        if (options.length > 0) {
-          // עובר לאפשרות הבאה ברשימה (במעגל)
-          const currentIndex = options.indexOf(dirObj.state);
-          const nextIndex = (currentIndex + 1) % options.length;
-          this._hass.callService(domain, 'select_option', {
-            entity_id: this._config.direction_entity,
-            option: options[nextIndex]
-          });
-        }
+        // מחליפים ישירות בין forward ל-reverse
+        const nextOption = currentState === 'forward' ? 'reverse' : 'forward';
+        
+        this._hass.callService(domain, 'select_option', {
+          entity_id: this._config.direction_entity,
+          option: nextOption
+        });
+
+        // עדכון מיידי של התצוגה והאנימציה לתחושת תגובתיות
+        this._isReverse = (nextOption === 'reverse');
+        this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
+
       } else if (['switch', 'input_boolean'].includes(domain)) {
         this._hass.callService(domain, 'toggle', { entity_id: this._config.direction_entity });
       }
-
-      // מחליפים מצב חזותי באופן מיידי לתחושת תגובתיות
-      this._isReverse = !this._isReverse;
-      this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
 
     } 
     // 2. טיפול במאפיין הכיוון המובנה של המאוורר (גיבוי מקורי)
@@ -812,7 +811,7 @@ class CeilingFanCard extends HTMLElement {
         direction: newDir
       });
 
-      this._isReverse = newDir === 'reverse';
+      this._isReverse = (newDir === 'reverse');
       this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
     }
   }
