@@ -864,9 +864,7 @@ class CeilingFanCardEditor extends HTMLElement {
       root.appendChild(extraBlock);
     }
 
-    r.appendChild(root);
-
-    // Entities section
+    // Entities section via ha-form with entity_list selector
     const entitiesTitle = document.createElement('div');
     entitiesTitle.className = 'section-title';
     entitiesTitle.textContent = 'ישויות נוספות';
@@ -874,25 +872,32 @@ class CeilingFanCardEditor extends HTMLElement {
 
     const entities = this._config.entities || [];
 
-    // Render existing entities
+    // Build each entity row
     const entitiesContainer = document.createElement('div');
-    entitiesContainer.id = 'entities-container';
     entities.forEach((cfg, i) => {
       entitiesContainer.appendChild(this._buildEntityRow(cfg, i));
     });
     root.appendChild(entitiesContainer);
 
-    // Add entity button
-    const addBtn = document.createElement('button');
-    addBtn.style.cssText = 'width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px dashed var(--divider-color);background:transparent;color:var(--secondary-text-color);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px';
-    addBtn.innerHTML = '<ha-icon icon="mdi:plus" style="--mdc-icon-size:16px"></ha-icon> הוסף ישות';
-    addBtn.addEventListener('click', () => {
-      const updated = [...(this._config.entities || []), { entity: '' }];
+    // Add entity button — opens ha-entity-picker inline
+    const addWrap = document.createElement('div');
+    addWrap.style.cssText = 'margin-top:8px';
+    const newPicker = document.createElement('ha-entity-picker');
+    newPicker.label = '+ הוסף ישות';
+    newPicker.value = '';
+    newPicker.allowCustomEntity = false;
+    if (this._hass) newPicker.hass = this._hass;
+    newPicker.addEventListener('value-changed', e => {
+      if (!e.detail.value) return;
+      const updated = [...(this._config.entities || []), { entity: e.detail.value }];
       this._config = { ...this._config, entities: updated };
       this._fire();
       this._render();
     });
-    root.appendChild(addBtn);
+    addWrap.appendChild(newPicker);
+    root.appendChild(addWrap);
+
+    r.appendChild(root);
 
     if (this._hass) {
       r.querySelectorAll('ha-form, hui-action-editor, ha-entity-picker').forEach(el => { el.hass = this._hass; });
@@ -904,9 +909,12 @@ class CeilingFanCardEditor extends HTMLElement {
     row.style.cssText = 'border:1px solid var(--divider-color);border-radius:8px;padding:10px;margin-bottom:8px;position:relative';
 
     // Delete button
-    const delBtn = document.createElement('ha-icon-button');
-    delBtn.style.cssText = 'position:absolute;top:4px;left:4px;--mdc-icon-size:18px;color:var(--secondary-text-color)';
-    delBtn.setAttribute('path', 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z');
+    const delBtn = document.createElement('button');
+    delBtn.style.cssText = 'position:absolute;top:6px;left:6px;background:none;border:none;cursor:pointer;padding:2px;color:var(--secondary-text-color);display:flex;align-items:center';
+    const delIcon = document.createElement('ha-icon');
+    delIcon.setAttribute('icon', 'mdi:close');
+    delIcon.style.setProperty('--mdc-icon-size', '18px');
+    delBtn.appendChild(delIcon);
     delBtn.addEventListener('click', () => {
       const updated = [...(this._config.entities || [])];
       updated.splice(i, 1);
