@@ -24,11 +24,26 @@ const CARD_STYLES = `
     position: relative;
     overflow: hidden;
     --fan-accent: var(--accent-color, #6366f1);
-    --fan-text: var(--primary-text-color, #212121);
-    --fan-subtext: var(--secondary-text-color, #727272);
-    --fan-divider: var(--divider-color, rgba(0,0,0,0.12));
-    --fan-bg2: var(--secondary-background-color, rgba(0,0,0,0.04));
-    --fan-disabled: var(--disabled-text-color, #bdbdbd);
+  }
+
+  /* ── מצב לילה (ברירת מחדל) ── */
+  :host {
+    --fan-text: #e1e1e1;
+    --fan-subtext: rgba(255,255,255,0.5);
+    --fan-divider: rgba(255,255,255,0.15);
+    --fan-bg2: rgba(255,255,255,0.06);
+    --fan-disabled: rgba(255,255,255,0.25);
+  }
+
+  /* ── מצב יום ── */
+  @media (prefers-color-scheme: light) {
+    :host {
+      --fan-text: #1a1a2e;
+      --fan-subtext: #555577;
+      --fan-divider: rgba(0,0,0,0.18);
+      --fan-bg2: rgba(0,0,0,0.06);
+      --fan-disabled: #9e9e9e;
+    }
   }
 
   ha-card::before {
@@ -57,8 +72,8 @@ const CARD_STYLES = `
   .icon-btn {
     width: 34px; height: 34px;
     border-radius: 50%;
-    border: 1.5px solid rgba(128,128,128,0.3);
-    background: rgba(128,128,128,0.08);
+    border: 1.5px solid var(--fan-divider);
+    background: var(--fan-bg2);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: all .3s;
@@ -124,8 +139,8 @@ const CARD_STYLES = `
 
   .spd-btn {
     border-radius: 8px;
-    border: 1px solid rgba(128,128,128,0.25);
-    background: rgba(128,128,128,0.08);
+    border: 1px solid var(--fan-divider);
+    background: var(--fan-bg2);
     cursor: pointer; padding: 6px 2px 5px;
     display: flex; flex-direction: column; align-items: center; gap: 3px;
     transition: all .2s;
@@ -145,7 +160,7 @@ const CARD_STYLES = `
   .spd-btn.active .btn-lbl { color: var(--fan-accent); }
 
   .bars { display: flex; gap: 1.5px; align-items: flex-end; height: 10px; }
-  .bar { width: 3px; border-radius: 2px; background: rgba(128,128,128,0.4); transition: background .2s; }
+  .bar { width: 3px; border-radius: 2px; background: var(--fan-divider); transition: background .2s; }
   .spd-btn.active .bar { background: var(--fan-accent); }
 `;
 
@@ -307,7 +322,6 @@ class CeilingFanCard extends HTMLElement {
     this._buildExtraBtn();
 
     // Apply light mode adjustments if needed
-    this._applyTheme();
   }
 
   _applyTheme() {
