@@ -5,14 +5,7 @@
  * entity: fan.my_ceiling_fan
  * name: מאוורר סלון
  * speed_names: [חלש מאוד, חלש, בינוני-חלש, בינוני, חזק, חזק מאוד]
- * extra_entity:
- *   entity: switch_timer.toggle_fan
- *   name: טיימר
- *   icon: mdi:camera-timer
- *   icon_color: teal
- *   tap_action:
- *     action: perform-action
- *     ...
+ * extra_entity: ...
  */
 
 const CARD_STYLES = `
@@ -91,6 +84,17 @@ const CARD_STYLES = `
     box-shadow: 0 0 8px color-mix(in srgb, var(--fan-accent) 35%, transparent);
   }
   .power-btn.on svg { stroke: var(--fan-accent); }
+
+  /* ── כפתור כיוון ── */
+  .dir-btn svg {
+    width: 15px; height: 15px;
+    stroke: var(--fan-subtext);
+    fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    transition: transform .4s ease, stroke .3s;
+  }
+  .dir-btn:hover { border-color: var(--fan-accent); }
+  .dir-btn:hover svg { stroke: var(--fan-text); }
+  .dir-btn.reverse svg { transform: scaleX(-1); } /* הופך את החץ כשהכיוון הפוך */
 
   .extra-btn {
     border-color: rgba(245,158,11,0.5);
@@ -281,6 +285,7 @@ class CeilingFanCard extends HTMLElement {
     this._lastTs = null;
     this._decelerating = false;
     this._isOn = false;
+    this._isReverse = false; // משתנה לשמירת מצב כיוון
   }
 
   set hass(hass) {
@@ -335,6 +340,9 @@ class CeilingFanCard extends HTMLElement {
       '<div class="header">' +
         '<div class="title" id="name">מאוורר תקרה</div>' +
         '<div class="btns" id="btns">' +
+          '<button class="icon-btn dir-btn" id="direction" style="display:none" title="החלף כיוון">' +
+            '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>' +
+          '</button>' +
           '<button class="icon-btn power-btn" id="power">' +
             '<svg viewBox="0 0 24 24"><path d="M12 2v6M6.3 6.3A8 8 0 1 0 17.7 6.3"/></svg>' +
           '</button>' +
@@ -372,6 +380,8 @@ class CeilingFanCard extends HTMLElement {
     r.appendChild(card);
 
     r.getElementById('power').addEventListener('click', () => this._togglePower());
+    r.getElementById('direction').addEventListener('click', () => this._toggleDirection());
+    
     r.querySelectorAll('.spd-btn').forEach(b =>
       b.addEventListener('click', () => this._setSpeed(parseInt(b.dataset.idx) + 1))
     );
@@ -422,6 +432,16 @@ class CeilingFanCard extends HTMLElement {
 
     const isOn = obj.state === 'on';
     let lvl = 0;
+
+    // טיפול אוטומטי בכפתור הכיוון
+    const dirBtn = this.shadowRoot.getElementById('direction');
+    if (obj.attributes.direction) {
+      dirBtn.style.display = 'flex';
+      this._isReverse = obj.attributes.direction === 'reverse';
+      dirBtn.classList.toggle('reverse', this._isReverse);
+    } else {
+      dirBtn.style.display = 'none';
+    }
 
     if (isOn) {
       const presets = obj.attributes.preset_modes;
@@ -728,7 +748,10 @@ class CeilingFanCard extends HTMLElement {
       }
     }
 
-    this._angle = (this._angle + 360 / this._currentDur * dt) % 360;
+    // סיבוב ימינה או שמאלה לפי כיוון המאוורר
+    const dirMult = this._isReverse ? -1 : 1;
+    this._angle = (this._angle + (360 / this._currentDur * dt * dirMult)) % 360;
+    
     this.shadowRoot.getElementById('blades')?.setAttribute('transform', 'rotate(' + this._angle + ' 52 52)');
     this._rafId = requestAnimationFrame(ts => this._loop(ts));
   }
@@ -736,6 +759,21 @@ class CeilingFanCard extends HTMLElement {
   _togglePower() {
     const isOn = this._hass?.states[this._entity]?.state === 'on';
     this._hass.callService('fan', isOn ? 'turn_off' : 'turn_on', { entity_id: this._entity });
+  }
+
+  _toggleDirection() {
+    const obj = this._hass?.states[this._entity];
+    if (!obj || !obj.attributes.direction) return;
+    const newDir = obj.attributes.direction === 'forward' ? 'reverse' : 'forward';
+    
+    this._hass.callService('fan', 'set_direction', {
+      entity_id: this._entity,
+      direction: newDir
+    });
+
+    // עדכון מיידי לאנימציה ולכפתור
+    this._isReverse = newDir === 'reverse';
+    this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
   }
 
   _setSpeed(n) {
@@ -768,7 +806,7 @@ class CeilingFanCard extends HTMLElement {
   }
 }
 
-/* ══ Editor המקורי והמשופר ══ */
+/* ══ Editor ══ */
 const EDITOR_STYLES = `
   :host { display: block; font-family: var(--paper-font-common-base_-_font-family); }
   .root { padding: 16px 0; }
@@ -850,12 +888,10 @@ class CeilingFanCardEditor extends HTMLElement {
     style.textContent = EDITOR_STYLES;
     r.appendChild(style);
 
-    // עטיפה עם dir="rtl" כדי שהכל ייראה טבעי ומיושר נכון כמו ב-HA
     const root = document.createElement('div');
     root.className = 'root';
     root.setAttribute('dir', 'rtl');
 
-    // 1. הגדרות ראשיות (ישות, שם)
     const mainForm = document.createElement('ha-form');
     mainForm.hass = this._hass;
     mainForm.schema = [
@@ -869,7 +905,6 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(mainForm);
 
-    // 2. שמות מהירויות - שימוש בגריד מובנה של HA
     const speedHeader = document.createElement('div');
     speedHeader.className = 'section-header';
     speedHeader.innerHTML = '<h3>שמות מהירויות (לפי סדר עולה)</h3>';
@@ -890,7 +925,6 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(speedForm);
 
-    // 3. כפתור נוסף (Extra Entity) - שימוש ב-ha-formfield תקני
     const extraHeader = document.createElement('div');
     extraHeader.className = 'section-header';
     extraHeader.innerHTML = '<h3>כפתור פעולה נוסף (מופיע ליד כפתור ההדלקה)</h3>';
@@ -936,7 +970,6 @@ class CeilingFanCardEditor extends HTMLElement {
       root.appendChild(extraForm);
     }
 
-    // 4. ישויות נוספות בתחתית הכרטיס
     const entitiesHeader = document.createElement('div');
     entitiesHeader.className = 'section-header';
     entitiesHeader.innerHTML = '<h3>ישויות נוספות (שורות בתחתית)</h3>';
@@ -949,7 +982,6 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(entitiesContainer);
 
-    // בוחר ישות להוספה - עיצוב נקי
     const addWrap = document.createElement('div');
     addWrap.className = 'add-entity-row';
     const newPicker = document.createElement('ha-entity-picker');
@@ -997,7 +1029,6 @@ class CeilingFanCardEditor extends HTMLElement {
     content.appendChild(form);
     row.appendChild(content);
 
-    // כפתור מחיקה סטנדרטי
     const delIcon = document.createElement('ha-icon');
     delIcon.setAttribute('icon', 'mdi:delete');
     delIcon.addEventListener('click', () => {
@@ -1019,6 +1050,6 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'ceiling-fan-card',
   name: 'Ceiling Fan Card',
-  description: 'כרטיס מאוורר תקרה — 3 להבים, עצירה הדרגתית, ישויות נוספות',
+  description: 'כרטיס מאוורר תקרה — 3 להבים, עצירה הדרגתית, כיוון וישויות נוספות',
   preview: true,
 });
