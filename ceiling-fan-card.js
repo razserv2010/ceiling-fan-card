@@ -743,7 +743,7 @@ class CeilingFanCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    this.shadowRoot.querySelectorAll('ha-entity-picker, ha-icon-picker, ha-form, hui-action-editor')
+    this.shadowRoot.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker, hui-action-editor')
       .forEach(el => { el.hass = hass; });
   }
 
@@ -866,9 +866,98 @@ class CeilingFanCardEditor extends HTMLElement {
 
     r.appendChild(root);
 
+    // Entities section
+    const entitiesTitle = document.createElement('div');
+    entitiesTitle.className = 'section-title';
+    entitiesTitle.textContent = 'ישויות נוספות';
+    root.appendChild(entitiesTitle);
+
+    const entities = this._config.entities || [];
+
+    // Render existing entities
+    const entitiesContainer = document.createElement('div');
+    entitiesContainer.id = 'entities-container';
+    entities.forEach((cfg, i) => {
+      entitiesContainer.appendChild(this._buildEntityRow(cfg, i));
+    });
+    root.appendChild(entitiesContainer);
+
+    // Add entity button
+    const addBtn = document.createElement('button');
+    addBtn.style.cssText = 'width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px dashed var(--divider-color);background:transparent;color:var(--secondary-text-color);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px';
+    addBtn.innerHTML = '<ha-icon icon="mdi:plus" style="--mdc-icon-size:16px"></ha-icon> הוסף ישות';
+    addBtn.addEventListener('click', () => {
+      const updated = [...(this._config.entities || []), { entity: '' }];
+      this._config = { ...this._config, entities: updated };
+      this._fire();
+      this._render();
+    });
+    root.appendChild(addBtn);
+
     if (this._hass) {
-      r.querySelectorAll('ha-form, hui-action-editor').forEach(el => { el.hass = this._hass; });
+      r.querySelectorAll('ha-form, hui-action-editor, ha-entity-picker').forEach(el => { el.hass = this._hass; });
     }
+  }
+
+  _buildEntityRow(cfg, i) {
+    const row = document.createElement('div');
+    row.style.cssText = 'border:1px solid var(--divider-color);border-radius:8px;padding:10px;margin-bottom:8px;position:relative';
+
+    // Delete button
+    const delBtn = document.createElement('ha-icon-button');
+    delBtn.style.cssText = 'position:absolute;top:4px;left:4px;--mdc-icon-size:18px;color:var(--secondary-text-color)';
+    delBtn.setAttribute('path', 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z');
+    delBtn.addEventListener('click', () => {
+      const updated = [...(this._config.entities || [])];
+      updated.splice(i, 1);
+      this._config = { ...this._config, entities: updated };
+      this._fire();
+      this._render();
+    });
+    row.appendChild(delBtn);
+
+    // Entity form
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.schema = [
+      { name: 'entity',    required: true, selector: { entity: {} } },
+      { name: 'name',      selector: { text: {} } },
+      { name: 'icon',      selector: { icon: {} } },
+    ];
+    form.data = {
+      entity: cfg.entity || '',
+      name:   cfg.name   || '',
+      icon:   cfg.icon   || '',
+    };
+    form.computeLabel = s => ({ entity: 'ישות', name: 'שם תווית', icon: 'אייקון' })[s.name] || s.name;
+    form.addEventListener('value-changed', e => {
+      const updated = [...(this._config.entities || [])];
+      updated[i] = { ...updated[i], ...e.detail.value };
+      this._config = { ...this._config, entities: updated };
+      this._fire();
+    });
+    row.appendChild(form);
+
+    // tap_action via hui-action-editor
+    const actionTitle = document.createElement('div');
+    actionTitle.style.cssText = 'font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--secondary-text-color);margin:10px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--divider-color)';
+    actionTitle.textContent = 'אינטראקציה';
+    row.appendChild(actionTitle);
+
+    const actionEditor = document.createElement('hui-action-editor');
+    actionEditor.hass   = this._hass;
+    actionEditor.label  = 'התנהגות בהקשה';
+    actionEditor.config = cfg.tap_action || { action: 'toggle' };
+    actionEditor.actions = ['more-info', 'toggle', 'navigate', 'url', 'perform-action', 'assist', 'none'];
+    actionEditor.addEventListener('value-changed', e => {
+      const updated = [...(this._config.entities || [])];
+      updated[i] = { ...updated[i], tap_action: e.detail.value };
+      this._config = { ...this._config, entities: updated };
+      this._fire();
+    });
+    row.appendChild(actionEditor);
+
+    return row;
   }
 }
 
