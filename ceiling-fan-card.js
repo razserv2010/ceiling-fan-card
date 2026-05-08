@@ -104,88 +104,21 @@ class CeilingFanCard extends HTMLElement {
 
   setConfig(config) {
     if (!config.entity) throw new Error('entity is required');
-    this._config = config;
-    this._entity = config.entity;
-    this._name   = config.name || null;
-
-    // Speed names — from flat keys or array
-    const sn = config.speed_names;
-    if (Array.isArray(sn)) {
-      this._speedNames = sn;
-    } else if (sn && typeof sn === 'object') {
-      // getConfigForm returns flat keys: speed_1..speed_6
-      this._speedNames = DEFAULT_SPEED_NAMES.map((d, i) => sn['speed_' + (i+1)] || d);
-    } else {
-      this._speedNames = DEFAULT_SPEED_NAMES;
-    }
-
+    this._config     = config;
+    this._entity     = config.entity;
+    this._name       = config.name || null;
+    this._speedNames = Array.isArray(config.speed_names)
+      ? config.speed_names
+      : DEFAULT_SPEED_NAMES;
     if (this._built) { this._built = false; this._build(); this._built = true; }
   }
 
-  get _extra() {
-    const c = this._config;
-    if (!c) return null;
-    // Support both flat keys (getConfigForm) and nested extra_entity object (YAML)
-    if (c.extra_entity && typeof c.extra_entity === 'object') return c.extra_entity;
-    if (c.extra_entity && typeof c.extra_entity === 'string') {
-      return {
-        entity:     c.extra_entity,
-        name:       c.extra_entity_name,
-        icon:       c.extra_entity_icon,
-        icon_color: c.extra_entity_color,
-        tap_action: c.extra_tap_action,
-      };
-    }
-    return null;
-  }
+  get _extra() { return this._config?.extra_entity || null; }
 
   getCardSize() { return this._extra ? 5 : 4; }
 
   static getStubConfig() { return { entity: 'fan.my_ceiling_fan' }; }
-
-  static getConfigForm() {
-    return {
-      schema: [
-        {
-          name: 'entity',
-          selector: { entity: { domain: 'fan' } },
-        },
-        {
-          name: 'name',
-          selector: { text: {} },
-        },
-        {
-          type: 'expandable',
-          name: 'speed_names',
-          title: 'שמות מהירויות',
-          schema: [
-            { name: 'speed_1', selector: { text: {} } },
-            { name: 'speed_2', selector: { text: {} } },
-            { name: 'speed_3', selector: { text: {} } },
-            { name: 'speed_4', selector: { text: {} } },
-            { name: 'speed_5', selector: { text: {} } },
-            { name: 'speed_6', selector: { text: {} } },
-          ],
-        },
-        {
-          type: 'expandable',
-          name: 'extra_entity',
-          title: 'ישות נוספת',
-          schema: [
-            { name: 'extra_entity',       selector: { entity: {} } },
-            { name: 'extra_entity_name',  selector: { text: {} } },
-            { name: 'extra_entity_icon',  selector: { icon: {} } },
-            { name: 'extra_entity_color', selector: { ui_color: {} } },
-            { name: 'extra_tap_action',   selector: { action: {} } },
-          ],
-        },
-      ],
-      assertConfig: (config) => {
-        if (!config.entity) throw new Error('entity is required');
-      },
-      computeLabel: (schema) => LABELS[schema.name] || schema.name,
-    };
-  }
+  static getConfigElement() { return document.createElement('ceiling-fan-card-editor'); }
 
   _build() {
     const r = this.shadowRoot;
@@ -388,23 +321,193 @@ class CeilingFanCard extends HTMLElement {
   }
 }
 
-/* ══ Editor — uses HA native getConfigForm ══ */
+/* ══ Editor ══ */
+const EDITOR_STYLES = `
+  :host { display: block; }
+  .root { padding: 4px 0; }
+  ha-form { display: block; }
+  .section-title {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--secondary-text-color); margin: 20px 0 8px;
+    padding-bottom: 4px; border-bottom: 1px solid var(--divider-color);
+  }
+  .extra-block { border: 1px solid var(--divider-color); border-radius: 8px; padding: 12px; margin-top: 8px; }
+  ha-entity-picker, ha-icon-picker { display: block; margin-bottom: 12px; }
+  ha-formfield { display: block; }
+`;
 
-const LABELS = {
-  entity:      'ישות מאוורר (fan.*)',
-  name:        'שם מותאם',
-  speed_1:     'מהירות 1',
-  speed_2:     'מהירות 2',
-  speed_3:     'מהירות 3',
-  speed_4:     'מהירות 4',
-  speed_5:     'מהירות 5',
-  speed_6:     'מהירות 6',
-  extra_entity:        'ישות נוספת',
-  extra_entity_name:   'שם תווית',
-  extra_entity_icon:   'אייקון',
-  extra_entity_color:  'צבע אייקון',
-  extra_tap_action:    'tap_action',
-};
+class CeilingFanCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._config = {};
+  }
+
+  setConfig(config) {
+    this._config = { ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    // Forward hass to all sub-elements
+    this.shadowRoot.querySelectorAll('ha-entity-picker, ha-icon-picker, ha-form, hui-action-editor')
+      .forEach(el => { el.hass = hass; });
+  }
+
+  _fire() {
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config }, bubbles: true, composed: true,
+    }));
+  }
+
+  _render() {
+    const r = this.shadowRoot;
+    r.innerHTML = '';
+
+    const style = document.createElement('style');
+    style.textContent = EDITOR_STYLES;
+    r.appendChild(style);
+
+    const root = document.createElement('div');
+    root.className = 'root';
+
+    // ── Main entity & name via ha-form ──
+    const mainForm = document.createElement('ha-form');
+    mainForm.hass   = this._hass;
+    mainForm.schema = [
+      { name: 'entity', required: true, selector: { entity: { domain: 'fan' } } },
+      { name: 'name',   selector: { text: {} } },
+    ];
+    mainForm.data = {
+      entity: this._config.entity || '',
+      name:   this._config.name   || '',
+    };
+    mainForm.computeLabel = s => ({ entity: 'ישות מאוורר', name: 'שם מותאם' })[s.name] || s.name;
+    mainForm.addEventListener('value-changed', e => {
+      this._config = { ...this._config, ...e.detail.value };
+      this._fire();
+    });
+    root.appendChild(mainForm);
+
+    // ── Speed names via ha-form ──
+    const speedTitle = document.createElement('div');
+    speedTitle.className = 'section-title';
+    speedTitle.textContent = 'שמות מהירויות';
+    root.appendChild(speedTitle);
+
+    const names = Array.isArray(this._config.speed_names)
+      ? this._config.speed_names
+      : DEFAULT_SPEED_NAMES;
+
+    const speedForm = document.createElement('ha-form');
+    speedForm.hass   = this._hass;
+    speedForm.schema = names.map((_, i) => ({
+      name: 'speed_' + (i+1), selector: { text: {} },
+    }));
+    speedForm.data = Object.fromEntries(names.map((n, i) => ['speed_' + (i+1), n]));
+    speedForm.computeLabel = s => 'מהירות ' + s.name.replace('speed_', '');
+    speedForm.addEventListener('value-changed', e => {
+      const updated = names.map((_, i) => e.detail.value['speed_' + (i+1)] || DEFAULT_SPEED_NAMES[i]);
+      this._config = { ...this._config, speed_names: updated };
+      this._fire();
+    });
+    root.appendChild(speedForm);
+
+    // ── Extra entity ──
+    const extraTitle = document.createElement('div');
+    extraTitle.className = 'section-title';
+    extraTitle.textContent = 'ישות נוספת';
+    root.appendChild(extraTitle);
+
+    const extra = this._config.extra_entity || null;
+
+    // Toggle switch for extra entity
+    const extraToggle = document.createElement('ha-formfield');
+    extraToggle.innerHTML = '<ha-switch id="extra-sw"' + (extra ? ' checked' : '') + '></ha-switch><span style="margin-right:8px;font-size:14px;color:var(--primary-text-color)">הוסף ישות לכרטיס</span>';
+    extraToggle.style.cssText = 'display:flex;align-items:center;flex-direction:row-reverse;justify-content:flex-end;gap:8px;margin-bottom:8px';
+    extraToggle.querySelector('ha-switch').addEventListener('change', e => {
+      if (e.target.checked) {
+        this._config = { ...this._config, extra_entity: { entity: '' } };
+      } else {
+        const { extra_entity, ...rest } = this._config;
+        this._config = rest;
+      }
+      this._fire();
+      this._render();
+    });
+    root.appendChild(extraToggle);
+
+    if (extra) {
+      const extraBlock = document.createElement('div');
+      extraBlock.className = 'extra-block';
+
+      // Entity + name + icon + color via ha-form
+      const extraForm = document.createElement('ha-form');
+      extraForm.hass   = this._hass;
+      extraForm.schema = [
+        { name: 'entity',     required: true, selector: { entity: {} } },
+        { name: 'name',       selector: { text: {} } },
+        { name: 'icon',       selector: { icon: {} } },
+        { name: 'icon_color', selector: { ui_color: {} } },
+      ];
+      extraForm.data = {
+        entity:     extra.entity     || '',
+        name:       extra.name       || '',
+        icon:       extra.icon       || '',
+        icon_color: extra.icon_color || '',
+      };
+      extraForm.computeLabel = s => ({
+        entity:     'ישות',
+        name:       'שם תווית',
+        icon:       'אייקון',
+        icon_color: 'צבע אייקון',
+      })[s.name] || s.name;
+      extraForm.addEventListener('value-changed', e => {
+        this._config = {
+          ...this._config,
+          extra_entity: { ...this._config.extra_entity, ...e.detail.value },
+        };
+        this._fire();
+      });
+      extraBlock.appendChild(extraForm);
+
+      // tap_action via hui-action-editor (native HA Interactions UI)
+      const actionTitle = document.createElement('div');
+      actionTitle.className = 'section-title';
+      actionTitle.textContent = 'אינטראקציה';
+      actionTitle.style.marginTop = '12px';
+      extraBlock.appendChild(actionTitle);
+
+      const actionEditor = document.createElement('hui-action-editor');
+      actionEditor.hass   = this._hass;
+      actionEditor.label  = 'התנהגות בהקשה';
+      actionEditor.config = extra.tap_action || { action: 'more-info' };
+      actionEditor.actions = [
+        'more-info', 'toggle', 'navigate', 'url',
+        'perform-action', 'assist', 'none',
+      ];
+      actionEditor.addEventListener('value-changed', e => {
+        this._config = {
+          ...this._config,
+          extra_entity: { ...this._config.extra_entity, tap_action: e.detail.value },
+        };
+        this._fire();
+      });
+      extraBlock.appendChild(actionEditor);
+
+      root.appendChild(extraBlock);
+    }
+
+    r.appendChild(root);
+
+    // Forward hass to all elements
+    if (this._hass) {
+      r.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker, hui-action-editor')
+        .forEach(el => { el.hass = this._hass; });
+    }
+  }
+}
 
 customElements.define('ceiling-fan-card', CeilingFanCard);
 customElements.define('ceiling-fan-card-editor', CeilingFanCardEditor);
