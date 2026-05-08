@@ -1,79 +1,153 @@
-/**
- * ceiling-fan-card — Home Assistant Lovelace Custom Card
- *
- * type: custom:ceiling-fan-card
- * entity: fan.my_ceiling_fan
- * name: מאוורר סלון
- * speed_names: [חלש מאוד, חלש, בינוני-חלש, בינוני, חזק, חזק מאוד]
- * extra_entity:
- *   entity: switch_timer.toggle_fan
- *   name: טיימר
- *   icon: mdi:camera-timer
- *   icon_color: teal
- *   tap_action:
- *     action: perform-action
- *     ...
- */
-
 const CARD_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800&display=swap');
-  :host { display: block; font-family: 'Heebo', sans-serif; }
-  .card-root {
-    background: linear-gradient(145deg, #1c2033, #161926);
-    border-radius: 28px; padding: 24px 22px 20px;
-    border: 1px solid rgba(255,255,255,0.07);
-    box-shadow: 0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
-    position: relative; overflow: hidden; color: white; display: block;
-  }
-  .card-root::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    border-radius: 28px 28px 0 0;
-    background: linear-gradient(90deg, #6366f1, #0ea5e9, #06b6d4);
+
+  :host { display: block; }
+
+  ha-card {
+    padding: 16px 16px 14px;
+    position: relative;
+    overflow: hidden;
   }
 
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-  .title { font-size: 15px; font-weight: 800; color: #f1f5f9; line-height: 1; }
-  .btns { display: flex; align-items: center; gap: 8px; }
-  .power-btn {
-    width: 34px; height: 34px; border-radius: 50%;
-    border: 1.5px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
-    cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .35s;
+  /* accent bar */
+  ha-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent-color, #6366f1), #0ea5e9, #06b6d4);
   }
-  .power-btn.on { border-color: rgba(99,102,241,0.6); box-shadow: 0 0 12px rgba(99,102,241,0.3); }
-  .power-btn svg { width: 14px; height: 14px; stroke: rgba(255,255,255,0.3); fill: none; stroke-width: 2; stroke-linecap: round; transition: stroke .3s; }
-  .power-btn.on svg { stroke: #818cf8; }
-  .extra-btn {
-    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .title {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--primary-text-color);
+    line-height: 1;
+  }
+
+  .btns {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .icon-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1.5px solid var(--divider-color);
+    background: var(--secondary-background-color);
+    cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    border: 1.5px solid rgba(251,191,36,0.4); background: rgba(251,191,36,0.08);
-    box-shadow: 0 0 10px rgba(251,191,36,0.15); transition: box-shadow .3s;
+    transition: all .3s;
+    padding: 0;
   }
-  .extra-btn:hover { box-shadow: 0 0 16px rgba(251,191,36,0.28); }
-  .extra-btn svg { width: 15px; height: 15px; fill: none; stroke: #fbbf24; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .fan-center { display: flex; flex-direction: column; align-items: center; gap: 10px; position: relative; margin-bottom: 14px; }
+
+  .power-btn.on {
+    border-color: var(--accent-color, #6366f1);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent-color, #6366f1) 35%, transparent);
+  }
+
+  .power-btn svg {
+    width: 14px; height: 14px;
+    stroke: var(--secondary-text-color);
+    fill: none; stroke-width: 2; stroke-linecap: round;
+    transition: stroke .3s;
+  }
+  .power-btn.on svg { stroke: var(--accent-color, #6366f1); }
+
+  .extra-btn {
+    border-color: rgba(245,158,11,0.5);
+    background: rgba(245,158,11,0.1);
+  }
+
+  .fan-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+
   .fan-glow {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -54%);
-    width: 130px; height: 130px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(99,102,241,0.15), transparent 65%);
-    opacity: 0; transition: opacity .5s; pointer-events: none;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -54%);
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--accent-color, #6366f1) 18%, transparent),
+      transparent 65%);
+    opacity: 0;
+    transition: opacity .5s;
+    pointer-events: none;
   }
   .fan-glow.active { opacity: 1; }
-  .fan-svg { width: 120px; height: 120px; overflow: visible; }
-  .fan-blade { transition: fill .4s, stroke .4s; }
-  .speed-name { font-size: 20px; font-weight: 800; color: #818cf8; text-shadow: 0 0 14px rgba(99,102,241,0.35); transition: color .3s, text-shadow .3s; }
-  .speed-name.off { color: rgba(255,255,255,0.12); text-shadow: none; }
-  .controls { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-bottom: 14px; }
-  .spd-btn {
-    border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.03);
-    cursor: pointer; padding: 7px 2px 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: all .2s;
+
+  .fan-svg { width: 110px; height: 110px; }
+
+  .speed-name {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent-color, #6366f1);
+    transition: color .3s;
   }
-  .spd-btn:hover { border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.07); transform: translateY(-1px); }
-  .spd-btn.active { border-color: rgba(99,102,241,0.5); background: rgba(99,102,241,0.12); box-shadow: 0 0 10px rgba(99,102,241,0.12); }
-  .btn-lbl { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.22); line-height: 1.15; text-align: center; direction: rtl; transition: color .2s; }
-  .spd-btn.active .btn-lbl { color: #a5b4fc; }
-  .bars { display: flex; gap: 1.5px; align-items: flex-end; height: 9px; }
-  .bar { width: 3px; border-radius: 2px; background: rgba(255,255,255,0.1); transition: background .2s; }
-  .spd-btn.active .bar { background: #818cf8; }
+  .speed-name.off {
+    color: var(--disabled-text-color, var(--secondary-text-color));
+    opacity: 0.4;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+  }
+
+  .spd-btn {
+    border-radius: 8px;
+    border: 1px solid var(--divider-color);
+    background: var(--secondary-background-color);
+    cursor: pointer;
+    padding: 6px 2px 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    transition: all .2s;
+  }
+  .spd-btn:hover {
+    border-color: var(--accent-color, #6366f1);
+    transform: translateY(-1px);
+  }
+  .spd-btn.active {
+    border-color: var(--accent-color, #6366f1);
+    background: color-mix(in srgb, var(--accent-color, #6366f1) 10%, var(--secondary-background-color));
+  }
+
+  .btn-lbl {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--secondary-text-color);
+    line-height: 1.15;
+    text-align: center;
+    direction: rtl;
+    transition: color .2s;
+  }
+  .spd-btn.active .btn-lbl { color: var(--accent-color, #6366f1); }
+
+  .bars { display: flex; gap: 1.5px; align-items: flex-end; height: 8px; }
+  .bar {
+    width: 3px; border-radius: 2px;
+    background: var(--divider-color);
+    transition: background .2s;
+  }
+  .spd-btn.active .bar { background: var(--accent-color, #6366f1); }
 `;
 
 const DEFAULT_SPEED_NAMES = ['חלש מאוד', 'חלש', 'בינוני-חלש', 'בינוני', 'חזק', 'חזק מאוד'];
@@ -138,7 +212,7 @@ class CeilingFanCard extends HTMLElement {
       '<div class="header">' +
         '<div><div class="title" id="name">מאוורר תקרה</div></div>' +
         '<div class="btns" id="btns">' +
-          '<button class="power-btn" id="power">' +
+          '<button class="icon-btn power-btn" id="power">' +
             '<svg viewBox="0 0 24 24"><path d="M12 2v6M6.3 6.3A8 8 0 1 0 17.7 6.3"/></svg>' +
           '</button>' +
         '</div>' +
