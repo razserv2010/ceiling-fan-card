@@ -60,7 +60,6 @@ const CARD_STYLES = `
   .fan-glow.active { opacity: 1; }
   .fan-svg { width: 120px; height: 120px; overflow: visible; }
   .fan-blade { transition: fill .4s, stroke .4s; }
-  .fan-blade-init { fill: color-mix(in srgb, var(--accent-color,#6366f1) 20%, transparent); stroke: color-mix(in srgb, var(--accent-color,#6366f1) 30%, transparent); }
   .speed-name { font-size: 20px; font-weight: 800; color: #818cf8; text-shadow: 0 0 14px rgba(99,102,241,0.35); transition: color .3s, text-shadow .3s; }
   .speed-name.off { color: rgba(255,255,255,0.12); text-shadow: none; }
   .controls { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-bottom: 14px; }
@@ -149,10 +148,11 @@ class CeilingFanCard extends HTMLElement {
         '<svg class="fan-svg" viewBox="0 0 104 104">' +
           '<rect x="50" y="0" width="4" height="14" rx="2" fill="rgba(255,255,255,0.1)"/>' +
           '<ellipse cx="52" cy="18" rx="10" ry="5" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.09)" stroke-width="0.8"/>' +
+          '<defs><ellipse id="blade-tmpl" cx="52" cy="30" rx="7" ry="22"/></defs>' +
           '<g id="blades">' +
-            '<ellipse class="fan-blade" id="b1" cx="52" cy="27" rx="7" ry="26" transform="rotate(0 52 52)" class="fan-blade-init" stroke-width="0.5"/>' +
-            '<ellipse class="fan-blade" id="b2" cx="52" cy="27" rx="7" ry="26" transform="rotate(120 52 52)" class="fan-blade-init" stroke-width="0.5"/>' +
-            '<ellipse class="fan-blade" id="b3" cx="52" cy="27" rx="7" ry="26" transform="rotate(240 52 52)" class="fan-blade-init" stroke-width="0.5"/>' +
+            '<use href="#blade-tmpl" id="b1" fill="rgba(99,102,241,0.24)" stroke="rgba(99,102,241,0.32)" stroke-width="0.5"/>' +
+            '<use href="#blade-tmpl" id="b2" transform="rotate(120 52 52)" fill="rgba(99,102,241,0.19)" stroke="rgba(99,102,241,0.26)" stroke-width="0.5"/>' +
+            '<use href="#blade-tmpl" id="b3" transform="rotate(240 52 52)" fill="rgba(99,102,241,0.24)" stroke="rgba(99,102,241,0.32)" stroke-width="0.5"/>' +
           '</g>' +
           '<circle cx="52" cy="52" r="10" fill="var(--card-background-color, #fff)" stroke="rgba(99,102,241,0.28)" stroke-width="1"/>' +
           '<circle cx="52" cy="52" r="6" fill="url(#hg)" stroke="rgba(99,102,241,0.18)" stroke-width="0.8"/>' +
@@ -260,15 +260,10 @@ class CeilingFanCard extends HTMLElement {
     const f2 = 'color-mix(in srgb, ' + accent + ' ' + Math.round(o2 * 100) + '%, transparent)';
     const s1 = 'color-mix(in srgb, ' + accent + ' ' + Math.round((o1+0.1) * 100) + '%, transparent)';
     const s2 = 'color-mix(in srgb, ' + accent + ' ' + Math.round((o2+0.08) * 100) + '%, transparent)';
-    r.getElementById('b1')?.setAttribute('fill', f1);
-    r.getElementById('b1')?.setAttribute('stroke', s1);
-    r.getElementById('b1')?.setAttribute('stroke-width', '0.5');
-    r.getElementById('b2')?.setAttribute('fill', f2);
-    r.getElementById('b2')?.setAttribute('stroke', s2);
-    r.getElementById('b2')?.setAttribute('stroke-width', '0.5');
-    r.getElementById('b3')?.setAttribute('fill', f1);
-    r.getElementById('b3')?.setAttribute('stroke', s1);
-    r.getElementById('b3')?.setAttribute('stroke-width', '0.5');
+    [['b1',f1,s1],['b2',f2,s2],['b3',f1,s1]].forEach(([id,f,s]) => {
+      const el = r.getElementById(id);
+      if (el) { el.setAttribute('fill', f); el.setAttribute('stroke', s); }
+    });
   }
 
   _startSpin(lvl) {
