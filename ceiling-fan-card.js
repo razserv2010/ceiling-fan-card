@@ -743,6 +743,10 @@ class CeilingFanCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    // Re-render if not yet rendered (hass arrives before/after setConfig)
+    if (!this.shadowRoot.querySelector('.root')) {
+      this._render();
+    }
     this.shadowRoot.querySelectorAll('ha-form, ha-entity-picker, ha-icon-picker, hui-action-editor')
       .forEach(el => { el.hass = hass; });
   }
@@ -899,8 +903,11 @@ class CeilingFanCardEditor extends HTMLElement {
 
     r.appendChild(root);
 
+    // Forward hass AFTER DOM is ready — critical for hui-action-editor
     if (this._hass) {
-      r.querySelectorAll('ha-form, hui-action-editor, ha-entity-picker').forEach(el => { el.hass = this._hass; });
+      r.querySelectorAll('ha-form, hui-action-editor, ha-entity-picker, ha-icon-picker').forEach(el => {
+        el.hass = this._hass;
+      });
     }
   }
 
