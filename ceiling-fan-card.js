@@ -436,15 +436,15 @@ class CeilingFanCard extends HTMLElement {
     const dirBtn = this.shadowRoot.getElementById('direction');
     let hasDirection = false;
 
-    // 1. קודם בודקים אם הוגדרה ישות נפרדת בהגדרות
+    // 1. בדיקה אם הוגדרה ישות כיוון נפרדת
     if (this._config.direction_entity && this._hass.states[this._config.direction_entity]) {
       hasDirection = true;
       const dirObj = this._hass.states[this._config.direction_entity];
       const dirStateStr = String(dirObj.state).toLowerCase().trim();
-      // בדיקה מדויקת לפי הסטטוסים שאמרת
-      this._isReverse = (dirStateStr === 'reverse');
+      // תמיכה ב-reverse, חורף, on
+      this._isReverse = (dirStateStr === 'reverse' || dirStateStr === 'חורף' || dirStateStr === 'on');
     } 
-    // 2. אם לא הוגדרה, בודקים אם יש מאפיין כיוון מובנה במאוורר
+    // 2. גיבוי - מאפיין כיוון מובנה במאוורר
     else if (obj.attributes && obj.attributes.direction) {
       hasDirection = true;
       this._isReverse = (obj.attributes.direction === 'reverse');
@@ -780,20 +780,25 @@ class CeilingFanCard extends HTMLElement {
     if (this._config.direction_entity && this._hass?.states[this._config.direction_entity]) {
       const dirObj = this._hass.states[this._config.direction_entity];
       const domain = this._config.direction_entity.split('.')[0];
-      const currentState = String(dirObj.state).toLowerCase().trim();
 
       if (['select', 'input_select'].includes(domain)) {
-        // מחליפים ישירות בין forward ל-reverse
-        const nextOption = currentState === 'forward' ? 'reverse' : 'forward';
-        
-        this._hass.callService(domain, 'select_option', {
-          entity_id: this._config.direction_entity,
-          option: nextOption
-        });
+        // משיג את האפשרויות הזמינות ישירות מהישות (למשל: ['קיץ', 'חורף'])
+        const options = dirObj.attributes.options || [];
+        if (options.length > 0) {
+          const currentIndex = options.indexOf(dirObj.state);
+          // מעביר לאפשרות הבאה במערך
+          const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % options.length : 0;
+          const nextOption = options[nextIndex];
+          
+          this._hass.callService(domain, 'select_option', {
+            entity_id: this._config.direction_entity,
+            option: nextOption
+          });
 
-        // עדכון מיידי של התצוגה והאנימציה לתחושת תגובתיות
-        this._isReverse = (nextOption === 'reverse');
-        this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
+          // עדכון מיידי של התצוגה והאנימציה לפי האפשרות שנבחרה
+          this._isReverse = (String(nextOption).toLowerCase() === 'reverse' || nextOption === 'חורף');
+          this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
+        }
 
       } else if (['switch', 'input_boolean'].includes(domain)) {
         this._hass.callService(domain, 'toggle', { entity_id: this._config.direction_entity });
