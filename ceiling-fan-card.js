@@ -463,18 +463,20 @@ class CeilingFanCard extends HTMLElement {
 
     if (isOn) {
       if (this._hasSpeedPresets(obj)) {
-        // מאוורר עם preset_modes בשמות עבריים — קרא לפי preset_mode
         const currentPreset = obj.attributes.preset_mode;
         if (currentPreset && currentPreset !== 'כבוי' && currentPreset !== 'off') {
           const idx = this._speedNames.indexOf(currentPreset);
           if (idx >= 0) lvl = idx + 1;
         }
       } else {
-        // מאוורר עם אחוזים בלבד — קרא לפי percentage
-        const pct = obj.attributes.percentage || 0;
-        if (pct > 0) {
+        // השתמש ב-pending אם קיים, אחרת חשב לפי אחוז
+        if (this._pendingLevel && obj.attributes.percentage > 0) {
+          lvl = this._pendingLevel;
+        } else if (obj.attributes.percentage > 0) {
           lvl = SPEED_PCT.reduce((best, p, i) =>
-            Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1);
+            Math.abs(p - obj.attributes.percentage) < Math.abs(SPEED_PCT[best - 1] - obj.attributes.percentage) ? i + 1 : best, 1);
+        } else {
+          this._pendingLevel = null;
         }
       }
     }
@@ -823,14 +825,13 @@ class CeilingFanCard extends HTMLElement {
   _setSpeed(n) {
     const obj = this._hass?.states[this._entity];
     if (this._hasSpeedPresets(obj)) {
-      // מאוורר סלון — שלח preset לפי שם המהירות
       const mode = this._speedNames[n - 1];
       this._hass.callService('fan', 'turn_on', {
         entity_id: this._entity,
         preset_mode: mode,
       });
     } else {
-      // שאר המאווררים — שלח אחוז
+      this._pendingLevel = n; // שמור מה בחרנו
       this._hass.callService('fan', 'turn_on', {
         entity_id: this._entity,
         percentage: SPEED_PCT[n - 1],
