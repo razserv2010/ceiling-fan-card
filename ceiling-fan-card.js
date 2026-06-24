@@ -832,6 +832,9 @@ class CeilingFanCard extends HTMLElement {
   _setSpeed(n) {
     const obj = this._hass?.states[this._entity];
     const presets = obj?.attributes?.preset_modes;
+    console.log('setSpeed', n, 'presets:', presets, 'speedNames:', this._speedNames);
+    const obj = this._hass?.states[this._entity];
+    const presets = obj?.attributes?.preset_modes;
   
     if (presets && presets.length > 0) {
       const speedNames = new Set([...this._speedNames, 'כבוי', 'off']);
