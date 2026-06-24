@@ -265,7 +265,7 @@ const CARD_STYLES = `
 const DEFAULT_SPEED_NAMES = ['חלש מאוד', 'חלש', 'בינוני-חלש', 'בינוני', 'חזק', 'חזק מאוד'];
 const TARGET_DURS = [3.5, 2.0, 1.2, 0.75, 0.45, 0.27];
 const BLADE_OPS   = [[0.24,0.19],[0.28,0.22],[0.32,0.26],[0.38,0.30],[0.44,0.36],[0.52,0.44]];
-const SPEED_PCT   = [17, 33, 50, 67, 83, 100];
+const SPEED_PCT   = [16, 33, 50, 66, 83, 100];
 const BAR_H       = [[4],[4,7],[4,7,9],[4,7,9,11],[4,7,9,11,13],[4,7,9,11,13,15]];
 
 function defaultTapAction(domain) {
