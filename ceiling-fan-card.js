@@ -459,19 +459,10 @@ class CeilingFanCard extends HTMLElement {
     }
 
     if (isOn) {
-      const presets = obj.attributes.preset_modes;
-      const currentPreset = obj.attributes.preset_mode;
-
-      if (presets && currentPreset && currentPreset !== 'כבוי' && currentPreset !== 'off') {
-        const modes = presets.filter(p => p !== 'כבוי' && p !== 'off');
-        const idx = modes.indexOf(currentPreset);
-        if (idx >= 0) lvl = idx + 1;
-      } else {
-        const pct = obj.attributes.percentage || 0;
-        if (pct > 0) {
-          lvl = SPEED_PCT.reduce((best, p, i) =>
-            Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1);
-        }
+      const pct = obj.attributes.percentage || 0;
+      if (pct > 0) {
+        lvl = SPEED_PCT.reduce((best, p, i) =>
+          Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1);
       }
     }
 
