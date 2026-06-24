@@ -833,12 +833,10 @@ class CeilingFanCard extends HTMLElement {
     const obj = this._hass?.states[this._entity];
     const presets = obj?.attributes?.preset_modes;
     console.log('setSpeed', n, 'presets:', presets, 'speedNames:', this._speedNames);
-    const obj = this._hass?.states[this._entity];
-    const presets = obj?.attributes?.preset_modes;
   
     if (presets && presets.length > 0) {
       const speedNames = new Set([...this._speedNames, 'כבוי', 'off']);
-      const modes = presets.filter(p => speedNames.has(p)); // רק פריסטים שהם שמות מהירות
+      const modes = presets.filter(p => speedNames.has(p));
       const mode = modes[n - 1];
       if (mode) {
         this._hass.callService('fan', 'turn_on', {
@@ -848,7 +846,6 @@ class CeilingFanCard extends HTMLElement {
         return;
       }
     }
-    // fallback — אחוזים (מאוורר הורים, מרפסת)
     this._hass.callService('fan', 'turn_on', { 
       entity_id: this._entity, 
       percentage: SPEED_PCT[n - 1] 
