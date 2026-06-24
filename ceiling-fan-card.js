@@ -425,6 +425,14 @@ class CeilingFanCard extends HTMLElement {
     btns.insertBefore(extraBtn, btns.firstChild);
   }
 
+  // בודק אם למאוורר יש preset_modes שתואמים לשמות המהירויות
+  _hasSpeedPresets(obj) {
+    const presets = obj?.attributes?.preset_modes;
+    if (!presets || presets.length === 0) return false;
+    const speedNames = new Set(this._speedNames);
+    return presets.some(p => speedNames.has(p));
+  }
+
   _sync() {
     const obj = this._hass?.states[this._entity];
     if (!obj) return;
@@ -436,21 +444,16 @@ class CeilingFanCard extends HTMLElement {
     const dirBtn = this.shadowRoot.getElementById('direction');
     let hasDirection = false;
 
-    // 1. בדיקה אם הוגדרה ישות כיוון נפרדת
     if (this._config.direction_entity && this._hass.states[this._config.direction_entity]) {
       hasDirection = true;
       const dirObj = this._hass.states[this._config.direction_entity];
       const dirStateStr = String(dirObj.state).trim();
-      // "חורף" נחשב כאנימציה הפוכה (reverse)
       this._isReverse = (dirStateStr.toLowerCase() === 'reverse' || dirStateStr === 'חורף' || dirStateStr === 'on');
-    } 
-    // 2. גיבוי - מאפיין כיוון מובנה במאוורר
-    else if (obj.attributes && obj.attributes.direction) {
+    } else if (obj.attributes && obj.attributes.direction) {
       hasDirection = true;
       this._isReverse = (obj.attributes.direction === 'reverse');
     }
 
-    // הצגה או הסתרה של הכפתור
     if (hasDirection) {
       dirBtn.style.display = 'flex';
       dirBtn.classList.toggle('reverse', this._isReverse);
@@ -459,10 +462,20 @@ class CeilingFanCard extends HTMLElement {
     }
 
     if (isOn) {
-      const pct = obj.attributes.percentage || 0;
-      if (pct > 0) {
-        lvl = SPEED_PCT.reduce((best, p, i) =>
-          Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1);
+      if (this._hasSpeedPresets(obj)) {
+        // מאוורר עם preset_modes בשמות עבריים — קרא לפי preset_mode
+        const currentPreset = obj.attributes.preset_mode;
+        if (currentPreset && currentPreset !== 'כבוי' && currentPreset !== 'off') {
+          const idx = this._speedNames.indexOf(currentPreset);
+          if (idx >= 0) lvl = idx + 1;
+        }
+      } else {
+        // מאוורר עם אחוזים בלבד — קרא לפי percentage
+        const pct = obj.attributes.percentage || 0;
+        if (pct > 0) {
+          lvl = SPEED_PCT.reduce((best, p, i) =>
+            Math.abs(p - pct) < Math.abs(SPEED_PCT[best - 1] - pct) ? i + 1 : best, 1);
+        }
       }
     }
 
@@ -767,18 +780,14 @@ class CeilingFanCard extends HTMLElement {
   }
 
   _toggleDirection() {
-    // 1. טיפול בישות כיוון נפרדת (אם הוגדרה)
     if (this._config.direction_entity && this._hass?.states[this._config.direction_entity]) {
       const dirObj = this._hass.states[this._config.direction_entity];
       const domain = this._config.direction_entity.split('.')[0];
       const currentState = String(dirObj.state).trim();
 
       if (['select', 'input_select'].includes(domain)) {
-        // משיג את האפשרויות הזמינות ישירות מהישות (למשל: ['קיץ', 'חורף']). 
-        // אם משום מה אין רשימה, מניח שזה 'קיץ' ו-'חורף' כגיבוי.
         const options = dirObj.attributes.options || ['קיץ', 'חורף'];
         let nextOption;
-        
         if (options.length > 0) {
           const currentIndex = options.indexOf(currentState);
           const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % options.length : 0;
@@ -786,48 +795,48 @@ class CeilingFanCard extends HTMLElement {
         } else {
           nextOption = currentState === 'קיץ' ? 'חורף' : 'קיץ';
         }
-        
         this._hass.callService(domain, 'select_option', {
           entity_id: this._config.direction_entity,
           option: nextOption
         });
-
-        // עדכון מיידי של התצוגה והאנימציה לפי האפשרות שנבחרה
         this._isReverse = (String(nextOption).toLowerCase() === 'reverse' || nextOption === 'חורף' || nextOption === 'on');
         this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
 
       } else if (['switch', 'input_boolean'].includes(domain)) {
         this._hass.callService(domain, 'toggle', { entity_id: this._config.direction_entity });
-        // עדכון חזותי ל-switch
         this._isReverse = !this._isReverse;
         this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
       }
-
-    } 
-    // 2. טיפול במאפיין הכיוון המובנה של המאוורר (גיבוי מקורי)
-    else {
+    } else {
       const obj = this._hass?.states[this._entity];
       if (!obj || !obj.attributes.direction) return;
       const newDir = obj.attributes.direction === 'forward' ? 'reverse' : 'forward';
-      
       this._hass.callService('fan', 'set_direction', {
         entity_id: this._entity,
         direction: newDir
       });
-
       this._isReverse = (newDir === 'reverse');
       this.shadowRoot.getElementById('direction')?.classList.toggle('reverse', this._isReverse);
     }
   }
 
   _setSpeed(n) {
-    this._hass.callService('fan', 'turn_on', { 
-      entity_id: this._entity, 
-      percentage: SPEED_PCT[n - 1] 
-    });
+    const obj = this._hass?.states[this._entity];
+    if (this._hasSpeedPresets(obj)) {
+      // מאוורר סלון — שלח preset לפי שם המהירות
+      const mode = this._speedNames[n - 1];
+      this._hass.callService('fan', 'turn_on', {
+        entity_id: this._entity,
+        preset_mode: mode,
+      });
+    } else {
+      // שאר המאווררים — שלח אחוז
+      this._hass.callService('fan', 'turn_on', {
+        entity_id: this._entity,
+        percentage: SPEED_PCT[n - 1],
+      });
+    }
   }
-
-
 
   _handleExtraTap() {
     if (!this._extra || !this._hass) return;
@@ -927,13 +936,12 @@ class CeilingFanCardEditor extends HTMLElement {
     root.className = 'root';
     root.setAttribute('dir', 'rtl');
 
-    // 1. הגדרות ראשיות
     const mainForm = document.createElement('ha-form');
     mainForm.hass = this._hass;
     mainForm.schema = [
       { name: 'entity', selector: { entity: { domain: 'fan' } } },
       { name: 'name', selector: { text: {} } },
-      { name: 'direction_entity', selector: { entity: {} } }, // שדה לישות כיוון נפרדת
+      { name: 'direction_entity', selector: { entity: {} } },
     ];
     mainForm.data = { 
       entity: this._config.entity || '', 
@@ -950,7 +958,6 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(mainForm);
 
-    // 2. שמות מהירויות
     const speedHeader = document.createElement('div');
     speedHeader.className = 'section-header';
     speedHeader.innerHTML = '<h3>שמות מהירויות (לפי סדר עולה)</h3>';
@@ -971,7 +978,6 @@ class CeilingFanCardEditor extends HTMLElement {
     });
     root.appendChild(speedForm);
 
-    // 3. כפתור אקסטרה
     const extraHeader = document.createElement('div');
     extraHeader.className = 'section-header';
     extraHeader.innerHTML = '<h3>כפתור פעולה נוסף (מופיע ליד כפתור ההדלקה)</h3>';
@@ -1017,7 +1023,6 @@ class CeilingFanCardEditor extends HTMLElement {
       root.appendChild(extraForm);
     }
 
-    // 4. ישויות נוספות
     const entitiesHeader = document.createElement('div');
     entitiesHeader.className = 'section-header';
     entitiesHeader.innerHTML = '<h3>ישויות נוספות (שורות בתחתית)</h3>';
